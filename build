@@ -1,0 +1,160 @@
+#!/bin/sh
+# build -- compile one package for one or more targets.
+#
+#   ./build <package> [target...] [--variant V] [--list]
+#
+# With no target, builds every enabled target the package declares. The
+# package's own build.sh is handed a ready compiler and a verified, unpacked
+# source tree, and is responsible for nothing but producing files in $OUT.
+#
+# Environment:
+#   SB_PACKAGES_DIR  where packages live      (default: ./packages)
+#   SB_CACHE_DIR     toolchains and sources   (default: ./.cache)
+#   SB_OUT_DIR       where tarballs land      (default: ./out)
+#   SB_WORK_DIR      scratch                  (default: ./.build)
+
+set -eu
+
+SB_PROG='build'
+HERE="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+
+. "$HERE/targets.sh"
+. "$HERE/lib/log.sh"
+. "$HERE/lib/toolchain.sh"
+. "$HERE/lib/fetch.sh"
+. "$HERE/lib/verify.sh"
+. "$HERE/lib/pack.sh"
+
+PACKAGES_DIR="${SB_PACKAGES_DIR:-$HERE/packages}"
+CACHE_DIR="${SB_CACHE_DIR:-$HERE/.cache}"
+OUT_DIR="${SB_OUT_DIR:-$HERE/out}"
+WORK_DIR="${SB_WORK_DIR:-$HERE/.build}"
+
+usage() {
+	printf 'usage: build <package> [target...] [--variant V] [--list]\n' >&2
+	exit 2
+}
+
+[ $# -ge 1 ] || usage
+PKG_NAME="$1"; shift
+
+WANT_VARIANT=''
+LIST_ONLY=0
+REQUESTED=''
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--variant) shift; [ $# -gt 0 ] || usage; WANT_VARIANT="$1" ;;
+		--list)    LIST_ONLY=1 ;;
+		-*)        usage ;;
+		*)         REQUESTED="$REQUESTED $1" ;;
+	esac
+	shift
+done
+
+PKG_DIR="$PACKAGES_DIR/$PKG_NAME"
+[ -f "$PKG_DIR/meta" ]     || die "no such package: $PKG_NAME"
+[ -x "$PKG_DIR/build.sh" ] || die "$PKG_NAME has no executable build.sh"
+
+# Defaults a meta may leave unset, cleared first so a previous package in the
+# same shell cannot leak into this one.
+TOOLCHAIN='zig'; TARGETS='all'; VARIANTS=''; SMOKE=''; SMOKE_EXPECT=''; REVISION='1'
+# shellcheck disable=SC1090,SC1091
+. "$PKG_DIR/meta"
+
+for v in PKG VERSION SOURCE SHA256; do
+	eval "val=\${$v:-}"
+	[ -n "$val" ] || die "$PKG_NAME/meta is missing $v"
+done
+
+# Which targets this package can be built for: its own list, intersected with
+# the matrix's enabled set. A package naming a disabled target is not an error
+# -- the target is simply skipped -- but naming a target that does not exist is.
+pkg_targets() {
+	if [ "$TARGETS" = 'all' ]; then
+		sb_targets_enabled
+	else
+		for t in $TARGETS; do
+			sb_target_exists "$t" || die "$PKG_NAME/meta names an unknown target: $t"
+			[ "$(sb_target_field "$t" enabled)" = '1' ] && printf '%s\n' "$t"
+		done
+	fi
+}
+
+AVAILABLE="$(pkg_targets)"
+
+if [ "$LIST_ONLY" = '1' ]; then
+	printf '%s %s-%s (toolchain: %s)\n' "$PKG" "$VERSION" "$REVISION" "$TOOLCHAIN"
+	for t in $AVAILABLE; do printf '  %s\n' "$t"; done
+	exit 0
+fi
+
+if [ -n "$REQUESTED" ]; then
+	BUILD_TARGETS=''
+	for t in $REQUESTED; do
+		sb_target_exists "$t" || die "no such target: $t"
+		printf '%s\n' "$AVAILABLE" | grep -qx "$t" \
+			|| die "$PKG_NAME does not build for $t"
+		BUILD_TARGETS="$BUILD_TARGETS $t"
+	done
+else
+	BUILD_TARGETS="$AVAILABLE"
+fi
+
+# A package with variants and none requested builds every variant; one without
+# variants builds a single unnamed build.
+if [ -n "$WANT_VARIANT" ]; then
+	BUILD_VARIANTS="$WANT_VARIANT"
+elif [ -n "$VARIANTS" ]; then
+	BUILD_VARIANTS="$VARIANTS"
+else
+	BUILD_VARIANTS='_'
+fi
+
+SB_SOURCE_SHA="$SHA256"
+export SB_SOURCE_SHA SMOKE_EXPECT
+
+for TARGET in $BUILD_TARGETS; do
+	for VARIANT in $BUILD_VARIANTS; do
+		[ "$VARIANT" = '_' ] && VARIANT=''
+
+		# A variant may be restricted to a subset of targets, declared in meta
+		# as VARIANT_TARGETS_<variant>. nmap's `full` uses this: it pulls in
+		# OpenSSL and libssh2 and is only worth building where it is used.
+		if [ -n "$VARIANT" ]; then
+			eval "vt=\${VARIANT_TARGETS_$VARIANT:-}"
+			if [ -n "$vt" ] && ! printf '%s\n' $vt | grep -qx "$TARGET"; then
+				log "skipping $TARGET/$VARIANT (not in VARIANT_TARGETS_$VARIANT)"
+				continue
+			fi
+		fi
+
+		label="$TARGET${VARIANT:+/$VARIANT}"
+		log "building $PKG $VERSION for $label"
+
+		sb_tc_setup "$TARGET" "$TOOLCHAIN" "$CACHE_DIR"
+
+		SRC="$WORK_DIR/$PKG/$label/src"
+		WORK="$WORK_DIR/$PKG/$label"
+		OUT="$WORK/stage"
+		rm -rf "$OUT"; mkdir -p "$OUT"
+		export TARGET VARIANT SRC WORK OUT
+
+		sb_fetch "$SOURCE" "$SHA256" "$CACHE_DIR/src" "$SRC" "$PKG_DIR/patches"
+
+		"$PKG_DIR/build.sh" || die "$PKG_NAME build.sh failed for $label"
+
+		# Every executable the recipe produced goes through the gate. A recipe
+		# that shipped a stray host binary is caught here rather than on a box.
+		found=0
+		for bin in "$OUT"/* "$OUT"/bin/*; do
+			[ -f "$bin" ] && [ -x "$bin" ] || continue
+			found=1
+			# shellcheck disable=SC2086
+			sb_verify "$bin" "$TARGET" $SMOKE || die "verification failed for $bin"
+		done
+		[ "$found" = '1' ] || die "$PKG_NAME build.sh produced no executable in $OUT"
+
+		tarball="$(sb_pack "$OUT" "$OUT_DIR" "$PKG" "$VERSION" "$REVISION" "$TARGET" "$VARIANT")"
+		log "done: $tarball ($(du -h "$tarball" | cut -f1))"
+	done
+done
