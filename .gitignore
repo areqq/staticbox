@@ -1,0 +1,8 @@
+# Local code-intelligence index, not project content.
+codedb.snapshot
+
+# Everything a build produces or downloads. None of it is source.
+/toolchain/
+/src-cache/
+/.build/
+/out/
