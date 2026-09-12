@@ -58,8 +58,21 @@ PKG_DIR="$PACKAGES_DIR/$PKG_NAME"
 # Defaults a meta may leave unset, cleared first so a previous package in the
 # same shell cannot leak into this one.
 TOOLCHAIN='zig'; TARGETS='all'; VARIANTS=''; SMOKE=''; SMOKE_EXPECT=''; REVISION='1'
+for _t in $(sb_targets_all); do eval "TOOLCHAIN_$(printf '%s' "$_t" | tr '-' '_')=''"; done
 # shellcheck disable=SC1090,SC1091
 . "$PKG_DIR/meta"
+
+# A package may override the backend for one target: TOOLCHAIN_<target>, with
+# any dash in the target name spelled as an underscore (TOOLCHAIN_armv7_neon).
+# This exists because a toolchain limitation is per (target, package), not per
+# package: zig 0.16 cannot link armv5 once a program calls malloc, since its
+# own allocator needs sub-word atomics that compiler-rt does not provide for
+# pre-ARMv6, while Bootlin's gcc has them through the kernel helpers.
+tc_for_target() {
+	_t="$(printf '%s' "$1" | tr '-' '_')"
+	eval "_o=\${TOOLCHAIN_$_t:-}"
+	printf '%s\n' "${_o:-$TOOLCHAIN}"
+}
 
 for v in PKG VERSION SOURCE SHA256; do
 	eval "val=\${$v:-}"
@@ -83,8 +96,8 @@ pkg_targets() {
 AVAILABLE="$(pkg_targets)"
 
 if [ "$LIST_ONLY" = '1' ]; then
-	printf '%s %s-%s (toolchain: %s)\n' "$PKG" "$VERSION" "$REVISION" "$TOOLCHAIN"
-	for t in $AVAILABLE; do printf '  %s\n' "$t"; done
+	printf '%s %s-%s\n' "$PKG" "$VERSION" "$REVISION"
+	for t in $AVAILABLE; do printf '  %-12s %s\n' "$t" "$(tc_for_target "$t")"; done
 	exit 0
 fi
 
@@ -131,7 +144,7 @@ for TARGET in $BUILD_TARGETS; do
 		label="$TARGET${VARIANT:+/$VARIANT}"
 		log "building $PKG $VERSION for $label"
 
-		sb_tc_setup "$TARGET" "$TOOLCHAIN" "$CACHE_DIR"
+		sb_tc_setup "$TARGET" "$(tc_for_target "$TARGET")" "$CACHE_DIR"
 
 		SRC="$WORK_DIR/$PKG/$label/src"
 		WORK="$WORK_DIR/$PKG/$label"

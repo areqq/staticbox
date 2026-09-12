@@ -1,0 +1,27 @@
+# DSVPN: ~1500 lines of C with its own Xoodoo-based crypto and no external
+# dependencies, so it cross-compiles static into ~100-150 kB. That size is why
+# it is here: it is small enough to hand to a device that has nothing, which is
+# the situation on plenty of routers with no openvpn binary.
+#
+# Pinned to a tag, not a branch. GitHub regenerates branch tarballs and they
+# are not byte-stable, so a branch cannot carry a meaningful checksum -- the
+# build this replaces fetched `master` and verified nothing.
+PKG=dsvpn
+VERSION=0.1.5
+REVISION=1
+SOURCE=https://github.com/jedisct1/dsvpn/archive/refs/tags/0.1.5.tar.gz
+SHA256=53c9ff2518acea188926a4f10d38929da7b61b6770d6ec00f73a4c82ff918c5e
+TOOLCHAIN=zig
+TARGETS=all
+
+# dsvpn has no --version. Run with no arguments it prints its usage banner and
+# exits 254, so demanding a zero exit would be wrong; what proves the binary
+# reached its own code is the banner.
+SMOKE=''
+SMOKE_EXPECT='DSVPN'
+
+# zig 0.16 cannot link armv5 for any program that calls malloc: its own
+# allocator (libzigc's SmpAllocator) needs __sync_*_1 and __sync_*_4, which
+# compiler-rt does not provide for pre-ARMv6 parts that have no LDREX/STREX.
+# Bootlin's gcc has them, routed through the kernel's __kuser_cmpxchg helper.
+TOOLCHAIN_armv5=bootlin

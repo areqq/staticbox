@@ -6,3 +6,4 @@ codedb.snapshot
 /src-cache/
 /.build/
 /out/
+/.cache/
