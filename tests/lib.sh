@@ -11,12 +11,15 @@ assert_eq() {
 	fi
 }
 
+# Both run the command in a subshell. Library functions call die(), which
+# exits, and without the subshell that would take the test run down with it
+# instead of registering as a failed assertion.
 assert_ok() {
-	if "$@" >/dev/null 2>&1; then pass "$1 exits 0"; else fail "$1 exits 0"; fi
+	if ( "$@" ) >/dev/null 2>&1; then pass "$1 exits 0"; else fail "$1 exits 0"; fi
 }
 
 assert_fails() {
-	if "$@" >/dev/null 2>&1; then fail "$1 exits non-zero"; else pass "$1 exits non-zero"; fi
+	if ( "$@" ) >/dev/null 2>&1; then fail "$1 exits non-zero"; else pass "$1 exits non-zero"; fi
 }
 
 assert_contains() {
