@@ -1,4 +1,4 @@
-# Projekt: `static` — centralne repo statycznych binarek multi-arch
+# Projekt: `staticbox` — centralne repo statycznych binarek multi-arch
 
 Data: 2026-09-13
 Status: zatwierdzony design, gotowy do rozpisania planu implementacji
@@ -32,7 +32,7 @@ Skutki, które ten projekt ma usunąć:
 
 ## 2. Zakres
 
-**Wchodzi do `static`:**
+**Wchodzi do `staticbox`:**
 - przepisy buildów przeniesione z `/home/q/ssh` (nmap, speedtest, busybox,
   dropbear-chroot) — **tylko skrypty i wiedza**, patrz §2.1
 - buildy przeniesione z `sshd-tunnel`: `client/` (dropbear) i `vpn-client/` (dsvpn)
@@ -42,7 +42,7 @@ Skutki, które ten projekt ma usunąć:
 **Zostaje poza:**
 - `sshd-tunnel` jako repo aplikacyjne: `run`, `rootfs-overlay`, instalator
   serwera, tryby `--vpn`/`--dsvpn`. Po etapie 1 ciągnie klienta z Releases
-  `static` zamiast go budować.
+  `staticbox` zamiast go budować.
 - `zigplayer` — osobny projekt, w całości poza tym repo. Służy wyłącznie jako
   źródło wzorców (macierz feature-based, detekcja CPU, bramki qemu w `build.zig`).
 
@@ -56,7 +56,7 @@ Ten katalog **nie nadaje się do `git init` w miejscu**. Zawiera:
 - `toolchain/` — 230 MB toolchainów Bootlin
 - katalogi `*-build-*` z artefaktami pośrednimi
 
-Do `static` idą wyłącznie: `build.sh`, `build_nmap.sh`, `build_speedtest.sh`,
+Do `staticbox` idą wyłącznie: `build.sh`, `build_nmap.sh`, `build_speedtest.sh`,
 `make_chroot.sh`, `localoptions.h`, `gen_cred_slots.sh`, `patch-cred`
 oraz treść `CLAUDE.md` przepisana do `docs/pitfalls.md`.
 
@@ -283,8 +283,8 @@ jednego przebiegu. Pierwszy plan obejmuje wyłącznie etap 0.
 Po przeniesieniu dropbeara `sshd-tunnel` kasuje `client/build.sh` i przestaje
 budować klienta. Wymaga to, w tej kolejności:
 
-1. `static` wydaje `dropbear-v2026.94-r1` ze wszystkimi targetami
-2. `sshd-tunnel/client/install.sh` przepięty na indeks `static`, z zachowaniem
+1. `staticbox` wydaje `dropbear-v2026.94-r1` ze wszystkimi targetami
+2. `sshd-tunnel/client/install.sh` przepięty na indeks `staticbox`, z zachowaniem
    dotychczasowych nazw targetów jako aliasów (`armv7` mapuje się teraz
    na `armv7` lub `armv7-neon` zależnie od detekcji)
 3. dopiero potem usunięcie `client/build.sh` i workflow `client.yml`
@@ -299,7 +299,7 @@ zainstalowane starym instalatorem dalej działają.
 - **`nmap --full` tylko na `armv7-neon`, `mipsel`, `x86_64`.** Wariant `full`
   ciągnie OpenSSL 3 i libssh2, ok. 10 minut na target; pełna macierz to ok. 90
   minut CI na jedno wydanie nmapa. `lean` leci na wszystkie.
-- **Repo `areqq/static`, publiczne.** Publiczne daje darmowe CI i działające
+- **Repo `areqq/staticbox`, publiczne.** Publiczne daje darmowe CI i działające
   `raw.githubusercontent` w `get.sh`; prywatne wymagałoby tokenu na boxie,
   co przy busyboxowym `wget` jest niepraktyczne.
 - **Język repo: angielski** (kod, komentarze, README, `docs/`), spójnie
