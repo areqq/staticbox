@@ -25,9 +25,14 @@
 #    the overwhelming majority of these devices ship, and a float-ABI mismatch
 #    does not fail to link -- it dies with an illegal instruction on the device.
 #
-#  * armv7 explicitly subtracts neon and d32. Plain -mcpu=cortex_a7 turns both
-#    on in zig, and a box with an A7 that has no NEON then takes a SIGILL. The
-#    baseline target has to actually be the baseline.
+#  * armv7 is spelled cortex_a9-neon-d32, which is not a typo for a7. The
+#    baseline has to be the oldest ARMv7-A hard-float part these tools might
+#    land on, and that means VFPv3-D16 with no NEON. Measured, not assumed:
+#    cortex_a7 minus neon and d32 still emits Tag_FP_arch VFPv4-D16, which
+#    would trap on a Cortex-A9 (VFPv3 only); and subtracting vfp4 as well does
+#    not even compile, because musl's own fma.c carries inline asm requiring
+#    VFP4 that is selected by the CPU model. cortex_a9 minus neon and d32
+#    produces exactly ARMv7-A / VFPv3-D16 / no SIMD.
 #
 #  * mips/mipsel pin mips32, meaning release 1. BCM7356 (BMIPS5000, the VU+
 #    Solo2) traps on r2 instructions, and zig's default for these targets is r2.
@@ -39,7 +44,7 @@
 SB_TARGETS='x86_64|1|x86_64-linux-musl||x86-64||qemu-x86_64-static||ELF64|LSB|X86-64|none
 i686|1|x86-linux-musl|-mcpu=i686|x86-i686||qemu-i386-static||ELF32|LSB|Intel 80386|none
 armv5|1|arm-linux-musleabi|-mcpu=arm926ej_s|armv5-eabi|-msoft-float|qemu-arm-static|arm926|ELF32|LSB|ARM|none
-armv7|1|arm-linux-musleabihf|-mcpu=cortex_a7-neon-d32|armv7-eabihf|-march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard|qemu-arm-static|cortex-a7|ELF32|LSB|ARM|arm-baseline
+armv7|1|arm-linux-musleabihf|-mcpu=cortex_a9-neon-d32|armv7-eabihf|-march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard|qemu-arm-static|cortex-a7|ELF32|LSB|ARM|arm-baseline
 armv7-neon|1|arm-linux-musleabihf|-mcpu=cortex_a15|armv7-eabihf|-mcpu=cortex-a15 -mfpu=neon-vfpv4 -mfloat-abi=hard|qemu-arm-static|cortex-a15|ELF32|LSB|ARM|arm-neon
 armv7-aes|0|arm-linux-musleabihf|-mcpu=cortex_a53+aes|armv7-eabihf|-mcpu=cortex-a53+crypto -mfloat-abi=hard|qemu-arm-static|cortex-a53|ELF32|LSB|ARM|arm-aes
 aarch64|1|aarch64-linux-musl||aarch64||qemu-aarch64-static||ELF64|LSB|AArch64|none
