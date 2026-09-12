@@ -37,6 +37,8 @@ else
 	printf '  skip arm fixture (%s absent)\n' "$FIX_ARM"
 fi
 
+# SMOKE_EXPECT is read by sb_verify_runs, not by this file.
+# shellcheck disable=SC2034
 if [ -f "$FIX_ARM" ] && command -v qemu-arm-static >/dev/null 2>&1; then
 	SMOKE_EXPECT='Nmap'
 	assert_ok sb_verify_runs "$FIX_ARM" armv7 --version

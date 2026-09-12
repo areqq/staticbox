@@ -1,0 +1,135 @@
+name: build
+
+# One workflow for every package. The matrix is computed at run time from
+# targets.sh and packages/*/meta, so adding a target or a package needs no edit
+# here.
+on:
+  push:
+    branches: [main]
+    paths: ['packages/**', 'lib/**', 'targets.sh', 'build', '.github/workflows/build.yml']
+    tags: ['*-v*']
+  pull_request:
+    paths: ['packages/**', 'lib/**', 'targets.sh', 'build']
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to build (empty = all)'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: gen
+        name: Compute the build matrix
+        run: |
+          set -eu
+          # A tag is always a release of exactly one package: <pkg>-v<version>.
+          case "$GITHUB_REF" in
+            refs/tags/*)
+              pkg="${GITHUB_REF#refs/tags/}"
+              pkg="${pkg%%-v*}"
+              ;;
+            *)
+              pkg="${{ github.event.inputs.package }}"
+              ;;
+          esac
+          echo "matrix=$(sh ci/matrix.sh $pkg)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    name: ${{ matrix.package }} ${{ matrix.target }}${{ matrix.variant && format('/{0}', matrix.variant) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential bzip2 xz-utils file \
+            qemu-user-static >/dev/null
+
+      # Only the compiled musl and compiler-rt for this target are worth
+      # caching (~100 MB). The zig release itself is a 55 MB download that
+      # takes seconds and unpacks to 400 MB, which would cost more to cache
+      # than it saves.
+      - name: Cache the compiled musl for this target
+        uses: actions/cache@v4
+        with:
+          path: .cache/zig/zig-cache
+          key: zig-0.16.0-musl-${{ matrix.target }}
+
+      - name: Cache the Bootlin toolchain for this target
+        uses: actions/cache@v4
+        with:
+          path: .cache/bootlin
+          key: bootlin-2025.08-1-${{ matrix.target }}
+
+      - name: Cache sources
+        uses: actions/cache@v4
+        with:
+          path: .cache/src
+          key: src-${{ matrix.package }}-${{ hashFiles(format('packages/{0}/meta', matrix.package)) }}
+
+      - name: Build
+        run: |
+          if [ -n "${{ matrix.variant }}" ]; then
+            ./build ${{ matrix.package }} ${{ matrix.target }} --variant ${{ matrix.variant }}
+          else
+            ./build ${{ matrix.package }} ${{ matrix.target }}
+          fi
+
+      # build already ran the gate; this puts what it checked into the log,
+      # which is what anyone debugging a device actually wants to read.
+      - name: Show what was produced
+        run: |
+          ls -l out/
+          for f in out/*.tar.gz; do
+            echo "== $f"
+            tar xzf "$f" -O ./MANIFEST
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.package }}-${{ matrix.target }}${{ matrix.variant && format('-{0}', matrix.variant) }}
+          path: |
+            out/*.tar.gz
+            out/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    needs: [prepare, build]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts }
+      - name: Collect release assets
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.sha256' \) \
+            -exec cp {} release/ \;
+          cp detect.sh release/
+          ls -l release/
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            release/*

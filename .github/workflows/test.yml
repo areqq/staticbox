@@ -1,0 +1,43 @@
+name: test
+
+# The shell test suite touches no network and builds nothing, so it runs on
+# every push and pull request. The build matrix is the expensive one.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qemu-user-static and shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-user-static shellcheck >/dev/null
+
+      # The fixtures are real foreign binaries. On a runner there are none, so
+      # those assertions skip; what still runs is every check that does not
+      # need one, which is most of the suite.
+      - name: Run the suite
+        run: sh tests/run-all.sh
+
+      - name: Lint every shell script
+        run: |
+          shellcheck -s sh --severity=warning build detect.sh ci/matrix.sh ci/targets-doc.sh \
+            lib/*.sh targets.sh packages/*/build.sh tests/*.sh
+
+      - name: docs/targets.md matches targets.sh
+        run: |
+          ./ci/targets-doc.sh > /tmp/targets.md
+          if ! cmp -s /tmp/targets.md docs/targets.md; then
+            echo "docs/targets.md is stale -- run ./ci/targets-doc.sh > docs/targets.md"
+            diff -u docs/targets.md /tmp/targets.md || true
+            exit 1
+          fi

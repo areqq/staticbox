@@ -135,6 +135,7 @@ for TARGET in $BUILD_TARGETS; do
 		# OpenSSL and libssh2 and is only worth building where it is used.
 		if [ -n "$VARIANT" ]; then
 			eval "vt=\${VARIANT_TARGETS_$VARIANT:-}"
+			# shellcheck disable=SC2086  # $vt is a word list on purpose
 			if [ -n "$vt" ] && ! printf '%s\n' $vt | grep -qx "$TARGET"; then
 				log "skipping $TARGET/$VARIANT (not in VARIANT_TARGETS_$VARIANT)"
 				continue
