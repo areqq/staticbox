@@ -39,6 +39,19 @@ if [ -f "$FIX_ARM" ]; then
 		"$(SB_FAKE_UNAME=aarch64 sh "$DETECT" --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo")" 'armv7-neon'
 fi
 
+if [ -f "$FIX_ARM" ]; then
+	# --all has to degrade, best first: a NEON box must still be able to take
+	# a package that only publishes the baseline build.
+	mk_cpuinfo 'neon vfpv3'
+	assert_eq 'a NEON box lists the neon build first' \
+		"$(SB_FAKE_UNAME=armv7l sh "$DETECT" --all --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo" | sed -n 1p)" 'armv7-neon'
+	assert_eq 'and falls back to the baseline' \
+		"$(SB_FAKE_UNAME=armv7l sh "$DETECT" --all --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo" | sed -n 2p)" 'armv7'
+	mk_cpuinfo 'vfp'
+	assert_eq 'a non-NEON box lists only the baseline' \
+		"$(SB_FAKE_UNAME=armv7l sh "$DETECT" --all --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo" | wc -l | tr -d ' ')" '1'
+fi
+
 mk_cpuinfo ''
 assert_eq 'x86_64 host' "$(SB_FAKE_UNAME=x86_64 sh "$DETECT" --probe /bin/true --cpuinfo "$TMP/cpuinfo")" 'x86_64'
 assert_fails env SB_FAKE_UNAME=vax sh "$DETECT" --probe /bin/true --cpuinfo "$TMP/cpuinfo"

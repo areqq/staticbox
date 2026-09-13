@@ -18,6 +18,8 @@
 #   10 elf_data       readelf -h "Data" endianness, LSB or MSB
 #   11 elf_machine    substring that must appear in readelf -h "Machine"
 #   12 isa_gate       which instruction-set check lib/verify.sh applies
+#   13 go_arch        GOARCH for the go backend
+#   14 go_env         extra go environment for it (GOARM, GOMIPS, GO386)
 #
 # Why some values are what they are:
 #
@@ -41,17 +43,17 @@
 #    hardware AES is negligible and it would cost a ninth of every CI run.
 #    Flip column 2 when a package arrives that genuinely profits from it.
 
-SB_TARGETS='x86_64|1|x86_64-linux-musl||x86-64||qemu-x86_64-static||ELF64|LSB|X86-64|none
-i686|1|x86-linux-musl|-mcpu=i686|x86-i686||qemu-i386-static||ELF32|LSB|Intel 80386|none
-armv5|1|arm-linux-musleabi|-mcpu=arm926ej_s|armv5-eabi|-msoft-float|qemu-arm-static|arm926|ELF32|LSB|ARM|none
-armv7|1|arm-linux-musleabihf|-mcpu=cortex_a9-neon-d32|armv7-eabihf|-march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard|qemu-arm-static|cortex-a7|ELF32|LSB|ARM|arm-baseline
-armv7-neon|1|arm-linux-musleabihf|-mcpu=cortex_a15|armv7-eabihf|-mcpu=cortex-a15 -mfpu=neon-vfpv4 -mfloat-abi=hard|qemu-arm-static|cortex-a15|ELF32|LSB|ARM|arm-neon
-armv7-aes|0|arm-linux-musleabihf|-mcpu=cortex_a53+aes|armv7-eabihf|-mcpu=cortex-a53+crypto -mfloat-abi=hard|qemu-arm-static|cortex-a53|ELF32|LSB|ARM|arm-aes
-aarch64|1|aarch64-linux-musl||aarch64||qemu-aarch64-static||ELF64|LSB|AArch64|none
-mips|1|mips-linux-musleabi|-mcpu=mips32|mips32|-march=mips32 -mabi=32 -msoft-float|qemu-mips-static|4Kc|ELF32|MSB|MIPS|mips32r1
-mipsel|1|mipsel-linux-musleabi|-mcpu=mips32|mips32el|-march=mips32 -mabi=32 -msoft-float|qemu-mipsel-static|4Kc|ELF32|LSB|MIPS|mips32r1'
+SB_TARGETS='x86_64|1|x86_64-linux-musl||x86-64||qemu-x86_64-static||ELF64|LSB|X86-64|none|amd64|
+i686|1|x86-linux-musl|-mcpu=i686|x86-i686||qemu-i386-static||ELF32|LSB|Intel 80386|none|386|GO386=softfloat
+armv5|1|arm-linux-musleabi|-mcpu=arm926ej_s|armv5-eabi|-msoft-float|qemu-arm-static|arm926|ELF32|LSB|ARM|none|arm|GOARM=5
+armv7|1|arm-linux-musleabihf|-mcpu=cortex_a9-neon-d32|armv7-eabihf|-march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard|qemu-arm-static|cortex-a7|ELF32|LSB|ARM|arm-baseline|arm|GOARM=7
+armv7-neon|1|arm-linux-musleabihf|-mcpu=cortex_a15|armv7-eabihf|-mcpu=cortex-a15 -mfpu=neon-vfpv4 -mfloat-abi=hard|qemu-arm-static|cortex-a15|ELF32|LSB|ARM|arm-neon|arm|GOARM=7
+armv7-aes|0|arm-linux-musleabihf|-mcpu=cortex_a53+aes|armv7-eabihf|-mcpu=cortex-a53+crypto -mfloat-abi=hard|qemu-arm-static|cortex-a53|ELF32|LSB|ARM|arm-aes|arm|GOARM=7
+aarch64|1|aarch64-linux-musl||aarch64||qemu-aarch64-static||ELF64|LSB|AArch64|none|arm64|
+mips|1|mips-linux-musleabi|-mcpu=mips32|mips32|-march=mips32 -mabi=32 -msoft-float|qemu-mips-static|4Kc|ELF32|MSB|MIPS|mips32r1|mips|GOMIPS=softfloat
+mipsel|1|mipsel-linux-musleabi|-mcpu=mips32|mips32el|-march=mips32 -mabi=32 -msoft-float|qemu-mipsel-static|4Kc|ELF32|LSB|MIPS|mips32r1|mipsle|GOMIPS=softfloat'
 
-SB_TARGET_FIELDS='name enabled zig_target zig_cpu bootlin_tc bootlin_flags qemu qemu_cpu elf_class elf_data elf_machine isa_gate'
+SB_TARGET_FIELDS='name enabled zig_target zig_cpu bootlin_tc bootlin_flags qemu qemu_cpu elf_class elf_data elf_machine isa_gate go_arch go_env'
 
 # sb_target_field <target> <field-name> -> value on stdout
 sb_target_field() {

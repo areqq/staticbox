@@ -13,6 +13,7 @@
 # moving a package between backends is one line in its `meta`.
 
 SB_ZIG_VER="${SB_ZIG_VER:-0.16.0}"
+SB_GO_VER="${SB_GO_VER:-1.27.1}"
 SB_TC_VER="${SB_TC_VER:-2025.08-1}"
 SB_BOOTLIN_BASE='https://toolchains.bootlin.com/downloads/releases/toolchains'
 
@@ -22,6 +23,16 @@ sb__zig_sha() {
 	case "$SB_ZIG_VER::$1" in
 		0.16.0::x86_64)  printf '70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00\n' ;;
 		0.16.0::aarch64) printf 'ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17\n' ;;
+		*) return 1 ;;
+	esac
+}
+
+# Pinned from https://go.dev/dl/?mode=json, same rule as zig: a new Go release
+# needs its sums added here before it can be used.
+sb__go_sha() {
+	case "$SB_GO_VER::$1" in
+		1.27.1::amd64) printf '63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445\n' ;;
+		1.27.1::arm64) printf '3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec\n' ;;
 		*) return 1 ;;
 	esac
 }
@@ -45,6 +56,9 @@ sb_tc_flags() {
 	case "$sb__be" in
 		zig)     sb__arch="$(sb_target_field "$sb__tgt" zig_cpu)" ;;
 		bootlin) sb__arch="$(sb_target_field "$sb__tgt" bootlin_flags)" ;;
+		# Go has no CFLAGS: the target is chosen entirely by GOARCH and friends,
+		# and CGO is off, so there is no C compiler in the picture at all.
+		go)      sb__arch='' ;;
 		*) warn "no such backend: $sb__be"; return 1 ;;
 	esac
 	printf '%s %s\n' "$SB_COMMON_CFLAGS" "$sb__arch" | sed 's/  */ /g; s/ $//'
@@ -95,11 +109,41 @@ sb__bootlin_fetch() {
 	printf '%s\n' "${sb__gcc%-gcc}"
 }
 
+# sb__go_fetch <cache_dir> -> path to the go binary, downloading if needed.
+sb__go_fetch() {
+	sb__cache="$1"
+	case "$(uname -m)" in
+		x86_64)  sb__ghost='amd64' ;;
+		aarch64) sb__ghost='arm64' ;;
+		*) die "no pinned Go $SB_GO_VER tarball for build host $(uname -m)" ;;
+	esac
+	sb__sha="$(sb__go_sha "$sb__ghost")" || die "no pinned Go $SB_GO_VER checksum for $sb__ghost"
+	sb__dir="$sb__cache/go-$SB_GO_VER-$sb__ghost"
+	if [ ! -x "$sb__dir/go/bin/go" ]; then
+		log "fetching go$SB_GO_VER.linux-$sb__ghost"
+		mkdir -p "$sb__dir"
+		curl -fsSL -o "$sb__cache/go.tar.gz" \
+			"https://go.dev/dl/go$SB_GO_VER.linux-$sb__ghost.tar.gz" \
+			|| die 'go download failed'
+		printf '%s  %s\n' "$sb__sha" "$sb__cache/go.tar.gz" | sha256sum -c --quiet - \
+			|| die 'go tarball checksum mismatch'
+		tar xf "$sb__cache/go.tar.gz" -C "$sb__dir"
+		rm -f "$sb__cache/go.tar.gz"
+	fi
+	[ -x "$sb__dir/go/bin/go" ] || die "go not found at $sb__dir/go/bin/go after unpacking"
+	printf '%s\n' "$sb__dir/go"
+}
+
 # sb_tc_setup <target> <backend> <cache_dir>
 # Exports the full compiler contract a recipe is handed.
 sb_tc_setup() {
 	SB_TARGET="$1"; SB_BACKEND="$2"; sb__cache="$3"
 	sb_target_exists "$SB_TARGET" || die "no such target: $SB_TARGET"
+	# Absolute from here on. Go refuses a relative GOPATH outright, and a
+	# recipe that changes directory -- most do -- would otherwise resolve a
+	# relative compiler path against the wrong place.
+	mkdir -p "$sb__cache"
+	sb__cache="$(CDPATH='' cd -- "$sb__cache" && pwd)"
 	CFLAGS="$(sb_tc_flags "$SB_TARGET" "$SB_BACKEND")" || die "cannot build flags for $SB_TARGET/$SB_BACKEND"
 	CXXFLAGS="$CFLAGS"
 	LDFLAGS="$SB_COMMON_LDFLAGS"
@@ -149,6 +193,27 @@ sb_tc_setup() {
 		sb__pfx="$(sb__bootlin_fetch "$sb__cache/bootlin" "$SB_TARGET")"
 		CC="$sb__pfx-gcc"; CXX="$sb__pfx-g++"
 		AR="$sb__pfx-ar"; RANLIB="$sb__pfx-ranlib"; STRIP="$sb__pfx-strip"
+		;;
+	go)
+		# Go cross-compiles itself: one toolchain, every target, no C compiler
+		# and no per-architecture download. CGO stays off, which is what makes
+		# the result static without asking for it.
+		GOROOT="$(sb__go_fetch "$sb__cache/go")"
+		GOPATH="$sb__cache/gopath"
+		GOCACHE="$sb__cache/gocache"
+		GO="$GOROOT/bin/go"
+		GOOS='linux'
+		GOARCH="$(sb_target_field "$SB_TARGET" go_arch)"
+		[ -n "$GOARCH" ] || die "$SB_TARGET has no GOARCH in the matrix"
+		CGO_ENABLED='0'
+		# GOARM / GOMIPS / GO386 for this target, exported by name.
+		for sb__kv in $(sb_target_field "$SB_TARGET" go_env); do
+			export "${sb__kv?}"
+		done
+		export GOROOT GOPATH GOCACHE GO GOOS GOARCH CGO_ENABLED
+		# Nothing C-shaped is meaningful here, and leaving stale values around
+		# would let a recipe pick up a compiler that cannot build for this target.
+		CC=''; CXX=''; AR=''; RANLIB=''; STRIP=''
 		;;
 	*) die "no such backend: $SB_BACKEND" ;;
 	esac

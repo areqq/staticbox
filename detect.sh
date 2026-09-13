@@ -1,9 +1,15 @@
 #!/bin/sh
 # detect.sh -- print the staticbox target name that suits THIS device.
 #
-#   ./detect.sh                 -> e.g. armv7-neon
+#   ./detect.sh                 -> the best target, e.g. armv7-neon
+#   ./detect.sh --all           -> every target this device can run, best first
 #   ./detect.sh --probe <elf>   -> read the ELF header from this file instead
 #   ./detect.sh --cpuinfo <f>   -> read CPU features from this file instead
+#
+# --all exists because packages do not all cover the same targets. A Go package
+# has no NEON variant to offer -- Go's GOARM=7 makes no such distinction -- so a
+# NEON box has to be willing to take the plain armv7 build. Walk the list and
+# take the first one the package actually publishes.
 #
 # The two override flags exist so this can be tested against binaries from
 # eight architectures without owning eight boxes.
@@ -21,8 +27,10 @@ set -u
 
 PROBE=''
 CPUINFO='/proc/cpuinfo'
+ALL=0
 while [ $# -gt 0 ]; do
 	case "$1" in
+		--all)      ALL=1 ;;
 		--probe)    shift; PROBE="${1:-}" ;;
 		--cpuinfo)  shift; CPUINFO="${1:-}" ;;
 		*) printf 'detect.sh: unknown option: %s\n' "$1" >&2; exit 2 ;;
@@ -76,8 +84,13 @@ has_feature() {
 # a box with crypto extensions gets the NEON build, which is correct -- just
 # not the fastest possible.
 arm_variant() {
-	if has_feature neon; then printf 'armv7-neon\n'
-	else printf 'armv7\n'; fi
+	if has_feature neon; then
+		printf 'armv7-neon\n'
+		[ "$ALL" = '1' ] && printf 'armv7\n'
+	else
+		printf 'armv7\n'
+	fi
+	return 0
 }
 
 case "$arch" in

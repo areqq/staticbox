@@ -1,0 +1,29 @@
+# speedtest-go: an Ookla (speedtest.net) client in Go. Fully static without
+# asking, because CGO is off.
+#
+# Pinned to a release tag rather than built with `go install pkg@latest`, which
+# is what the recipe this replaces did: @latest has no checksum and produces a
+# different binary every time upstream pushes. The tag tarball carries a
+# SHA-256, and the module's own go.sum pins every dependency below it.
+PKG=speedtest
+VERSION=1.8.3
+REVISION=1
+SOURCE=https://github.com/showwin/speedtest-go/archive/refs/tags/v1.8.3.tar.gz
+SHA256=48d01137468da9d419a3940a652803dafd8a6820abcd985b85c9d0c86b417ba3
+TOOLCHAIN=go
+# No armv7-neon: Go's GOARM=7 has no NEON variant, so that build would be
+# byte-identical to armv7 -- verified, same SHA-256 -- and it could not satisfy
+# the NEON gate either, because Go emits no ARM build attributes at all. One
+# armv7 build serves both kinds of box; detect.sh --all degrades to it.
+TARGETS='x86_64 i686 armv5 armv7 aarch64 mips mipsel'
+
+SMOKE='--version'
+SMOKE_EXPECT='speedtest-go'
+
+# UNVERIFIED ON REAL HARDWARE: Go's documented floor is a newer kernel than the
+# 2.6.32 a VU+ Solo2 runs. Under qemu-mipsel with `-r 2.6.32` the binary starts
+# and prints its version, but that only shows Go does not check uname and
+# refuse -- qemu still services the syscalls from the host kernel, so it proves
+# nothing about which syscalls a real 2.6.32 has. The only real test is the box.
+# If it fails there, a small LibreSpeed client in C or Zig is the way out: that
+# protocol is far simpler than Ookla's, and a native binary has no kernel floor.
