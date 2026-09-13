@@ -139,3 +139,71 @@ ffmpeg has `error.c` and `error_resilience.c`, so the filter matched twenty
 compile lines and pushed the real message out of view -- CI showed nothing but
 `make: Error 1` for six failing jobs. `sb_dump_log` shows genuine diagnostic
 lines and then the tail, where a failing make puts the reason.
+
+## A binary that runs perfectly and has lost half its job
+
+git's Makefile decides at build time whether it found libcurl. When it did not,
+nothing fails: every binary compiles, links, passes the architecture gate and
+prints its own version. What is missing is the file `git-remote-https`, and the
+first symptom is on the device, on the first clone, as `Unable to find remote
+helper for 'https'`.
+
+This is the shape the deep check exists for, and it is the same shape as nmap's
+`full` variant quietly losing OpenSSL. The generic gate inspects the binaries a
+recipe produced; it cannot know which ones were supposed to exist.
+
+## A relocatable tarball needs the program's consent
+
+Everything here is unpacked wherever the device has room, usually
+`/tmp/staticbox/<pkg>`. A program that only ever looks at its own `argv[0]`
+does not care. git does: it resolves its ~180 helper commands and its
+templates through a prefix, and by default that prefix is compiled in.
+
+`RUNTIME_PREFIX` makes it resolve them from `/proc/self/exe` instead. Without
+it git still starts, still prints its version and still passes every check that
+looks at one binary at a time -- and then cannot find a single subcommand that
+is not a builtin. The deep check asserts `git --exec-path` lands inside the
+staging directory, which is not the prefix it was configured with, so only a
+run-time resolution can put it there.
+
+## "busybox cannot do that" is a claim, not a fact
+
+git installs its ~150 commands as hard links to one binary, and the first
+instinct was to turn that off -- `NO_INSTALL_HARDLINKS` -- on the theory that
+busybox tar would not restore them and would leave a silently broken install.
+
+Checked instead of assumed, against the busybox this repo builds: a hard link
+comes back with a link count of 2 and the right contents. The theory cost
+5.4 MB on armv5 -- 27.1 MB installed against 21.7 MB -- on devices where /tmp
+is RAM.
+
+## "Off" does not mean "absent"
+
+`NO_PERL` does not stop git installing its Perl commands. It installs a
+108-byte shell script in their place that explains the feature was not built --
+useful in `libexec/git-core`, where `git cvsserver` then says so instead of
+"not a git command", and wrong in `bin/`, which is what goes on the device's
+PATH. The gate refused it as a non-ELF file in `bin/`, correctly, and the
+recipe removes that one copy rather than the mechanism.
+
+## Every new git needs a toolchain git did not need before
+
+git 2.55 builds part of `libgit` as a Rust staticlib and invokes `cargo` to do
+it; the build stops with `cargo: not found` after compiling several hundred C
+objects. `NO_RUST` turns it off, and upstream says that option disappears in
+git 3.0 -- so following git past 2.x means a rustup toolchain plus a musl std
+for all nine targets, beside the zig and Bootlin backends already here.
+
+A smaller version of the same thing: `config.mak.uname` sets
+`LINK_FUZZ_PROGRAMS` for every Linux build, so `make all` also links the
+oss-fuzz harnesses -- with `--allow-multiple-definition`, which zig's linker
+refuses outright. Scaffolding that is never installed, failing a build of
+things that are.
+
+## musl has no `REG_STARTEND`
+
+git's `grep` needs it to match inside a buffer it does not own. Neither zig's
+musl nor Bootlin's defines it, and `NO_REGEX` is the answer -- git then uses
+the compat regex it carries for exactly this case. Checked in the headers
+rather than inferred from a failed build, because the failure is a compile
+error in a file that looks like it has nothing to do with the C library.

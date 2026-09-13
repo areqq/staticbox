@@ -1,0 +1,57 @@
+# git, statically linked, with https and ssh.
+#
+# The whole point of putting git on one of these boxes is `git clone` against a
+# real remote, and in practice that means https. So zlib, OpenSSL and curl are
+# cross-built first and git-remote-https is built against them.
+#
+# ssh:// needs no help from this recipe: git runs whatever GIT_SSH or
+# core.sshCommand names. dropbear's dbclient works because of how git handles a
+# client it does not recognise -- it probes with `ssh -G`, dbclient has no such
+# option and exits non-zero, and git settles on its "simple" variant, which
+# passes nothing but -p and the host. Read out of connect.c, not assumed.
+#
+# Three deps, and OpenSSL is most of the cost: about ten minutes a target, the
+# same as nmap's full variant. Unlike nmap there is no cheaper variant, because
+# a git that cannot fetch over https is not the tool anyone installed.
+#
+# TLS belongs to curl here, not to git: NO_OPENSSL leaves git on its own
+# sha1collisiondetection rather than OpenSSL's SHA-1, which is what upstream
+# ships by default and what catches SHAttered-style collisions.
+#
+# zig, not bootlin, for the reason packages/curl gives: Bootlin publishes no
+# soft-float MIPS toolchain, so a bootlin build is hard-float and takes SIGILL
+# on a MIPS part with no FPU.
+PKG=git
+VERSION=2.55.0
+REVISION=1
+SOURCE=https://mirrors.edge.kernel.org/pub/software/scm/git/git-2.55.0.tar.xz
+SHA256=457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357
+TOOLCHAIN=zig
+TARGETS=all
+
+DEPS='zlib openssl curl'
+DEP_SOURCE_zlib=https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
+DEP_SHA256_zlib=9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
+DEP_SOURCE_openssl=https://github.com/openssl/openssl/releases/download/openssl-3.0.16/openssl-3.0.16.tar.gz
+DEP_SHA256_openssl=57e03c50feab5d31b152af2b764f10379aecd8ee92f16c985983ce4a99f7ef86
+DEP_SOURCE_curl=https://curl.se/download/curl-8.18.0.tar.xz
+DEP_SHA256_curl=40df79166e74aa20149365e11ee4c798a46ad57c34e4f68fd13100e2c9a91946
+
+SMOKE='--version'
+SMOKE_EXPECT='git version 2.55.0'
+
+# The other executables that land in bin/. None of them takes --version: each
+# prints its own usage or refusal and exits, which is a working binary, so the
+# expectation is a string from that output rather than the exit status. Every
+# one of these was read off the binary rather than guessed -- "git receive-pack"
+# and "git-upload-pack" really do differ in that one character.
+SMOKE_git_receive_pack=''
+SMOKE_EXPECT_git_receive_pack='usage: git receive-pack'
+SMOKE_git_upload_pack=''
+SMOKE_EXPECT_git_upload_pack='usage: git-upload-pack'
+SMOKE_git_upload_archive=''
+SMOKE_EXPECT_git_upload_archive='usage: git upload-archive'
+SMOKE_git_shell=''
+SMOKE_EXPECT_git_shell='Interactive git shell'
+SMOKE_scalar=''
+SMOKE_EXPECT_scalar='usage: scalar'
