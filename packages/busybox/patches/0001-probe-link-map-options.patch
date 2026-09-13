@@ -1,0 +1,31 @@
+# lld rejects both --warn-common and -Map outright: "error: unsupported linker
+# arg", which kills the link rather than merely losing a diagnostic. The script
+# already probes --sort-section and --sort-common with check_cc before using
+# them; these were simply never given the same treatment. Everything in
+# INFO_OPTS is informational -- a link map and a verbose trace -- so skipping
+# the set when the linker will not take it costs only the report.
+--- a/scripts/trylink
++++ b/scripts/trylink
+@@ -95,8 +95,21 @@
+ 
+ START_GROUP="-Wl,--start-group"
+ END_GROUP="-Wl,--end-group"
++
++# Probed as a set, the way --sort-section and --sort-common are probed just
++# below, rather than assumed. lld rejects both --warn-common and -Map outright
++# ("error: unsupported linker arg"), which kills the link. Everything in here
++# is diagnostic only -- a link map and a verbose trace -- so dropping it when
++# the linker will not take it costs nothing but the report.
++INFO_FLAGS="-Wl,--warn-common -Wl,-Map,busybox.map -Wl,--verbose"
++if ! check_cc "$INFO_FLAGS"; then
++    echo "Your linker does not support the link-map options; skipping them"
++    INFO_FLAGS=""
++fi
++
+ INFO_OPTS() {
+-	echo "-Wl,--warn-common -Wl,-Map,$EXE.map -Wl,--verbose"
++	if test x"$INFO_FLAGS" = x""; then echo ""; else
++	echo "-Wl,--warn-common -Wl,-Map,$EXE.map -Wl,--verbose"; fi
+ }
+ 
+ # gold may not support --sort-common (yet)

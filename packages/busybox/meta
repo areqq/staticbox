@@ -1,0 +1,20 @@
+# BusyBox: the whole userland in one static binary. On a box whose own
+# /bin/sh is a 2014-era build with half the applets missing, this is the
+# difference between being able to work and not.
+PKG=busybox
+VERSION=1.37.0
+REVISION=1
+SOURCE=https://busybox.net/downloads/busybox-1.37.0.tar.bz2
+SHA256=3311dff32e746499f4df0d5df04d7eb396382d7e108bb9250e7b519b837043a4
+TOOLCHAIN=zig
+TARGETS=all
+
+# Run with no arguments busybox prints its banner and applet list, then exits
+# 1. That is a working binary, so the banner is what proves it ran.
+SMOKE=''
+SMOKE_EXPECT='BusyBox'
+
+# Same reason as dsvpn: zig 0.16 cannot link armv5 once a program calls
+# malloc, because its allocator needs __sync_*_1 and __sync_*_4 that
+# compiler-rt does not provide for pre-ARMv6 parts without LDREX/STREX.
+TOOLCHAIN_armv5=bootlin
