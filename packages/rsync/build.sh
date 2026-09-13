@@ -12,12 +12,19 @@ cd "$SRC"
 # left enabled, configure finds the build host's shared copies and the link
 # fails or -- worse -- succeeds against headers that do not match the target.
 #
+# --disable-simd and --disable-asm: rsync's x86_64 checksum path calls
+# __builtin_cpu_supports, whose runtime support (__cpu_model,
+# __cpu_indicator_init) lives in libgcc and has no counterpart in zig's
+# compiler-rt. What it costs is checksum speed on x86_64 and nothing at all on
+# the architectures these boxes actually are.
+#
 # --with-included-zlib=yes keeps rsync's own bundled zlib, which is what the
 # protocol's own compression needs and is built for the target along with
 # everything else.
 ./configure --host="$SB_HOST_TRIPLE" \
 	CC="$CC" CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" \
 	--with-included-zlib=yes \
+	--disable-simd --disable-asm \
 	--disable-xxhash --disable-zstd --disable-lz4 \
 	--disable-openssl --disable-md2man \
 	--disable-acl-support --disable-xattr-support \
