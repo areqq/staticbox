@@ -14,6 +14,11 @@ cd "$SRC"
 # x86 to the 32-bit x86 family itself.
 FF_ARCH="${SB_HOST_TRIPLE%%-*}"
 
+# ffmpeg needs an nm to work out the symbol prefix. GNU nm reads foreign ELF
+# perfectly well, so the host's does the job; llvm-nm is preferred when it is
+# there but is not something a CI runner has by default.
+FF_NM="$(command -v llvm-nm 2>/dev/null || command -v nm)"
+
 # --pkg-config=false stops configure from finding the build host's libraries
 # and enabling features whose headers do not match the target. Without it a
 # cross build happily links against whatever the machine happens to have.
@@ -25,7 +30,7 @@ FF_ARCH="${SB_HOST_TRIPLE%%-*}"
 	--arch="$FF_ARCH" \
 	--target-os=linux \
 	--cross-prefix='' \
-	--cc="$CC" --cxx="$CXX" --ar="$AR" --ranlib="$RANLIB" --nm='llvm-nm' \
+	--cc="$CC" --cxx="$CXX" --ar="$AR" --ranlib="$RANLIB" --nm="$FF_NM" \
 	--extra-cflags="$CFLAGS" \
 	--extra-ldflags="$LDFLAGS" \
 	--pkg-config=false \
