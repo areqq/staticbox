@@ -1,0 +1,19 @@
+# socat: relays between anything and anything -- TCP, UDP, UNIX sockets, PTYs,
+# files, processes. The tool you want on a box when something has to be
+# forwarded and nothing else is installed.
+PKG=socat
+VERSION=1.8.0.3
+REVISION=1
+SOURCE=http://www.dest-unreach.org/socat/download/socat-1.8.0.3.tar.gz
+SHA256=a9f9eb6cfb9aa6b1b4b8fe260edbac3f2c743f294db1e362b932eb3feca37ba4
+TOOLCHAIN=zig
+TARGETS=all
+
+SMOKE='-V'
+SMOKE_EXPECT='socat version'
+# filan has no -V. With no arguments it dumps the fd table, which says nothing
+# recognisable about filan itself; -h prints its banner, which is what proves
+# its own code ran.
+SMOKE_filan='-h'
+SMOKE_EXPECT_filan='filan by'
+SMOKE_EXPECT_procan='procan version'

@@ -130,6 +130,7 @@ else
 fi
 
 SB_SOURCE_SHA="$SHA256"
+SB_PKG_SMOKE="$SMOKE"
 SB_PKG_SMOKE_EXPECT="$SMOKE_EXPECT"
 export SB_SOURCE_SHA SMOKE_EXPECT
 
@@ -149,7 +150,6 @@ for TARGET in $BUILD_TARGETS; do
 			fi
 		fi
 
-		SMOKE_EXPECT="$SB_PKG_SMOKE_EXPECT"
 		label="$TARGET${VARIANT:+/$VARIANT}"
 		log "building $PKG $VERSION for $label"
 
@@ -210,10 +210,14 @@ for TARGET in $BUILD_TARGETS; do
 			[ -f "$bin" ] && [ -x "$bin" ] || continue
 			found=1
 			bin_key="$(basename "$bin" | tr '-' '_')"
-			bin_smoke="$SMOKE"
-			bin_expect="$SMOKE_EXPECT"
-			eval "bin_smoke=\${SMOKE_$bin_key-\$SMOKE}"
-			eval "bin_expect=\${SMOKE_EXPECT_$bin_key-\$SMOKE_EXPECT}"
+			# The fallback is the package-wide value captured before the
+			# loop, never the live SMOKE_EXPECT: that one is reassigned on
+			# every iteration, so using it would make each binary inherit the
+			# previous binary's expectation.
+			bin_smoke="$SB_PKG_SMOKE"
+			bin_expect="$SB_PKG_SMOKE_EXPECT"
+			eval "bin_smoke=\${SMOKE_$bin_key-\$SB_PKG_SMOKE}"
+			eval "bin_expect=\${SMOKE_EXPECT_$bin_key-\$SB_PKG_SMOKE_EXPECT}"
 			SMOKE_EXPECT="$bin_expect"
 			export SMOKE_EXPECT
 			# shellcheck disable=SC2086
