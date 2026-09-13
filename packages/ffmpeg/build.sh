@@ -23,6 +23,15 @@ FF_ARCH="${SB_HOST_TRIPLE%%-*}"
 # there but is not something a CI runner has by default.
 FF_NM="$(command -v llvm-nm 2>/dev/null || command -v nm)"
 
+# ffmpeg takes its flags through --extra-cflags/--extra-ldflags AND reads
+# CFLAGS and LDFLAGS from the environment, so passing both puts everything on
+# the link line twice. Duplicated -Os is harmless; a duplicated object file is
+# not, and the toolchain's shim rides in LDFLAGS -- "duplicate symbol: pipe",
+# at the very first compiler test, which reads as "C compiler test failed".
+FF_CFLAGS="$CFLAGS"
+FF_LDFLAGS="$LDFLAGS"
+unset CFLAGS LDFLAGS
+
 # --pkg-config=false stops configure from finding the build host's libraries
 # and enabling features whose headers do not match the target. Without it a
 # cross build happily links against whatever the machine happens to have.
@@ -48,8 +57,8 @@ FF_NM="$(command -v llvm-nm 2>/dev/null || command -v nm)"
 	--target-os=linux \
 	--cross-prefix='' \
 	--cc="$CC" --cxx="$CXX" --ar="$AR" --ranlib="$RANLIB" --nm="$FF_NM" \
-	--extra-cflags="$CFLAGS" \
-	--extra-ldflags="$LDFLAGS" \
+	--extra-cflags="$FF_CFLAGS" \
+	--extra-ldflags="$FF_LDFLAGS" \
 	--pkg-config=false \
 	--prefix=/usr \
 	--disable-shared --enable-static \
