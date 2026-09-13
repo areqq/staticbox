@@ -25,6 +25,13 @@ FF_NM="$(command -v llvm-nm 2>/dev/null || command -v nm)"
 #
 # ffplay is not built: it needs SDL, which would be another cross-build for a
 # player nothing on a headless box would run.
+#
+# --disable-x86asm because ffmpeg's x86 assembly needs nasm, and requiring a
+# host assembler contradicts what this repo promises -- that a clean machine
+# needs only curl, tar and make. It costs SIMD speed on x86_64 and i686 only:
+# the ARM and MIPS assembly goes through the ordinary assembler, so the targets
+# these boxes actually are keep theirs. Anyone who wants the fast x86 build can
+# install nasm and drop this line.
 ./configure \
 	--enable-cross-compile \
 	--arch="$FF_ARCH" \
@@ -37,6 +44,7 @@ FF_NM="$(command -v llvm-nm 2>/dev/null || command -v nm)"
 	--prefix=/usr \
 	--disable-shared --enable-static \
 	--disable-doc --disable-debug --disable-ffplay \
+	--disable-x86asm \
 	--disable-autodetect \
 	>"$WORK/configure.log" 2>&1 \
 	|| { tail -n 30 "$WORK/configure.log" >&2; exit 1; }
