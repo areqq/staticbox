@@ -102,6 +102,33 @@ JOBS="$(nproc 2>/dev/null || echo 2)"
 # ---------------------------------------------------------------------- git
 cd "$SRC"
 
+# Two programs are dropped before the build, not after it, so the time to
+# compile and link them is saved too.
+#
+#  git-http-fetch  the client for the *dumb* HTTP protocol -- a repository
+#                  served as a plain directory of files by a web server with no
+#                  git backend. Smart HTTP replaced it in 2010 and `git clone
+#                  https://...` never invokes it. Dumb HTTP still works
+#                  regardless: git-remote-http links http-walker.o itself, so
+#                  the fallback lives there and not in this program.
+#  git-imap-send   puts a patch series into an IMAP Drafts folder so a mail
+#                  client can send it. A kernel-list workflow, on a set-top box.
+#
+# They are not small. Each links its own copy of libcurl and OpenSSL, which on
+# armv5 is 4.4 MB apiece -- 8.8 MB of a 21 MB install for two things nobody
+# will run on one of these devices.
+#
+# PROGRAMS is derived from PROGRAM_OBJS, so deleting these two lines removes
+# them from the build and from the install alike. EXCLUDED_PROGRAMS would not:
+# it only feeds generate-cmdlist.sh, which is why it is also set in config.mak
+# -- otherwise `git help -a` would still list two commands that are not there.
+sed -i '/^PROGRAM_OBJS += imap-send\.o$/d'   Makefile
+sed -i '/^	PROGRAM_OBJS += http-fetch\.o$/d' Makefile
+grep -q 'PROGRAM_OBJS += imap-send\.o' Makefile && {
+	printf 'imap-send.o was not removed from PROGRAM_OBJS\n' >&2; exit 1; }
+grep -q 'PROGRAM_OBJS += http-fetch\.o' Makefile && {
+	printf 'http-fetch.o was not removed from PROGRAM_OBJS\n' >&2; exit 1; }
+
 # git's own configuration mechanism, read after config.mak.uname and before
 # everything that acts on these variables. Used rather than a make command line
 # so that `EXTLIBS +=` appends to the platform defaults instead of replacing
@@ -171,6 +198,7 @@ cd "$SRC"
 	printf 'NO_OPENSSL = YesPlease\n'
 	printf 'NO_RUST = YesPlease\n'
 	printf 'LINK_FUZZ_PROGRAMS =\n'
+	printf 'EXCLUDED_PROGRAMS += git-http-fetch git-imap-send\n'
 
 	printf 'ZLIB_PATH = %s\n' "$DEP_PREFIX"
 	printf 'CURL_CONFIG = %s/bin/curl-config\n' "$DEP_PREFIX"
