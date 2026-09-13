@@ -2,7 +2,7 @@
 # ffmpeg recipe. Compiles only.
 #
 # Given: TARGET VARIANT SRC WORK OUT CC CXX AR RANLIB STRIP CFLAGS CXXFLAGS
-#        LDFLAGS SB_HOST_TRIPLE
+#        LDFLAGS SB_HOST_TRIPLE SB_BUILD_TRIPLE
 set -eu
 
 # Helpers the driver cannot hand over through the environment: a recipe is a

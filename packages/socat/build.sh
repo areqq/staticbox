@@ -2,7 +2,7 @@
 # socat recipe. Compiles only.
 #
 # Given: TARGET VARIANT SRC WORK OUT CC CXX AR RANLIB STRIP CFLAGS LDFLAGS
-#        SB_HOST_TRIPLE
+#        SB_HOST_TRIPLE SB_BUILD_TRIPLE
 set -eu
 
 # Helpers the driver cannot hand over through the environment: a recipe is a
@@ -22,7 +22,7 @@ cd "$SRC"
 # probe, which cannot work when the probe is for another architecture. Left to
 # fail they are simply treated as absent, which silently drops working
 # features -- so each one is answered with what these targets actually have.
-./configure --host="$SB_HOST_TRIPLE" \
+./configure --build="$SB_BUILD_TRIPLE" --host="$SB_HOST_TRIPLE" \
 	CC="$CC" CFLAGS="$CFLAGS -Wno-error=date-time" LDFLAGS="$LDFLAGS" \
 	--disable-openssl --disable-readline \
 	sc_cv_sys_crdly_shift=12 \

@@ -3,7 +3,7 @@
 # unpacked nmap and, for the full variant, OpenSSL and libssh2.
 #
 # Given: TARGET VARIANT SRC WORK OUT CC CXX AR RANLIB STRIP CFLAGS CXXFLAGS
-#        LDFLAGS SB_HOST_TRIPLE DEP_PREFIX SRC_openssl SRC_libssh2
+#        LDFLAGS SB_HOST_TRIPLE SB_BUILD_TRIPLE DEP_PREFIX SRC_openssl SRC_libssh2
 #
 # Every workaround below is here because the build failed without it. They are
 # spelled out rather than summarised, because each one cost a debugging session
@@ -64,7 +64,7 @@ if [ "$VARIANT" = 'full' ]; then
 
 	# ---------------------------------------------------------- libssh2
 	( cd "$SRC_libssh2"
-	  ./configure --host="$SB_HOST_TRIPLE" --prefix="$DEP_PREFIX" \
+	  ./configure --build="$SB_BUILD_TRIPLE" --build="$SB_BUILD_TRIPLE" --host="$SB_HOST_TRIPLE" --prefix="$DEP_PREFIX" \
 		--disable-shared --enable-static --disable-examples-build \
 		--with-crypto=openssl --with-libssl-prefix="$DEP_PREFIX" \
 		CC="$CC" CFLAGS="$CFLAGS -I$DEP_PREFIX/include" LDFLAGS="-L$DEP_PREFIX/lib" \
@@ -89,7 +89,7 @@ export LIBS="$EXTRA_LIBS"
 export ac_cv_linux_vers=2
 
 # shellcheck disable=SC2086  # $CONF_CRYPTO is two options, not one word
-./configure --host="$SB_HOST_TRIPLE" \
+./configure --build="$SB_BUILD_TRIPLE" --host="$SB_HOST_TRIPLE" \
 	$CONF_CRYPTO \
 	--without-zenmap --without-ndiff --without-nping --without-ncat \
 	--with-libpcap=included --with-liblua=included --with-libpcre=included \

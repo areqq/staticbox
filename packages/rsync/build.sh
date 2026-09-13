@@ -2,7 +2,7 @@
 # rsync recipe. Compiles only.
 #
 # Given: TARGET VARIANT SRC WORK OUT CC CXX AR RANLIB STRIP CFLAGS LDFLAGS
-#        SB_HOST_TRIPLE
+#        SB_HOST_TRIPLE SB_BUILD_TRIPLE
 set -eu
 
 # Helpers the driver cannot hand over through the environment: a recipe is a
@@ -29,7 +29,7 @@ cd "$SRC"
 # --with-included-zlib=yes keeps rsync's own bundled zlib, which is what the
 # protocol's own compression needs and is built for the target along with
 # everything else.
-./configure --host="$SB_HOST_TRIPLE" \
+./configure --build="$SB_BUILD_TRIPLE" --host="$SB_HOST_TRIPLE" \
 	CC="$CC" CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" \
 	--with-included-zlib=yes \
 	--disable-roll-simd --disable-roll-asm --disable-md5-asm \

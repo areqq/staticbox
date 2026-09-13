@@ -185,6 +185,17 @@ sb__shim_object() {
 # Exports the full compiler contract a recipe is handed.
 sb_tc_setup() {
 	SB_TARGET="$1"; SB_BACKEND="$2"; sb__cache="$3"
+
+	# The machine doing the building, for autoconf's --build. Passing it is
+	# not cosmetic. Given only --host, autoconf sets cross_compiling=maybe and
+	# settles the question by trying to run a target binary -- and with
+	# qemu-user's binfmt_misc handlers registered in the kernel, that succeeds,
+	# so autoconf concludes it is NOT cross-compiling and starts running its
+	# test programs under emulation. curl's DNS probe then hung for an hour
+	# under qemu-mips. With both --build and --host given and different,
+	# cross_compiling=yes is decided outright and no test program is ever run.
+	SB_BUILD_TRIPLE="$(uname -m)-pc-linux-gnu"
+	export SB_BUILD_TRIPLE
 	sb_target_exists "$SB_TARGET" || die "no such target: $SB_TARGET"
 	# Absolute from here on. Go refuses a relative GOPATH outright, and a
 	# recipe that changes directory -- most do -- would otherwise resolve a

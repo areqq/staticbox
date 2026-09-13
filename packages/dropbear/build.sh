@@ -3,7 +3,7 @@
 # unpacked and patched the source, and set up the compiler.
 #
 # Given: TARGET VARIANT SRC WORK OUT CC CXX AR RANLIB STRIP CFLAGS LDFLAGS
-#        SB_HOST_TRIPLE
+#        SB_HOST_TRIPLE SB_BUILD_TRIPLE
 set -eu
 
 # Helpers the driver cannot hand over through the environment: a recipe is a
@@ -21,7 +21,7 @@ cd "$SRC"
 # Everything disabled here is absent on these devices or absent from musl:
 # there is no PAM, no shadow, no utmp/wtmp implementation, and no zlib to link
 # against in a static binary that must not depend on the image.
-./configure --host="$SB_HOST_TRIPLE" \
+./configure --build="$SB_BUILD_TRIPLE" --host="$SB_HOST_TRIPLE" \
 	CC="$CC" AR="$AR" RANLIB="$RANLIB" \
 	CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" \
 	--enable-static --disable-zlib --disable-pam --disable-shadow \

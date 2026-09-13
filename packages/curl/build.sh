@@ -3,7 +3,7 @@
 # unpacked curl and OpenSSL.
 #
 # Given: TARGET VARIANT SRC WORK OUT CC CXX AR RANLIB STRIP CFLAGS CXXFLAGS
-#        LDFLAGS SB_HOST_TRIPLE SB_TARGET_LIBS DEP_PREFIX SRC_openssl
+#        LDFLAGS SB_HOST_TRIPLE SB_BUILD_TRIPLE SB_TARGET_LIBS DEP_PREFIX SRC_openssl
 set -eu
 
 # Helpers the driver cannot hand over through the environment: a recipe is a
@@ -64,7 +64,7 @@ cd "$SRC"
 # Everything that would pull another library is off: no libidn2, no libpsl, no
 # zstd, no brotli, no nghttp2. Each would need its own cross-build, and none
 # earns that for fetching a file onto a set-top box.
-./configure --host="$SB_HOST_TRIPLE" \
+./configure --build="$SB_BUILD_TRIPLE" --host="$SB_HOST_TRIPLE" \
 	CC="$CC" CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS -L$DEP_PREFIX/lib" \
 	CPPFLAGS="-I$DEP_PREFIX/include" \
 	--with-openssl="$DEP_PREFIX" --with-ca-fallback \
