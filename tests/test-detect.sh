@@ -12,8 +12,8 @@ rm -rf "$TMP"; mkdir -p "$TMP"
 # header of a binary that is certainly native, not from uname.
 mk_cpuinfo() { printf 'Features\t: %s\n' "$1" > "$TMP/cpuinfo"; }
 
-FIX_MIPSEL="${SB_FIXTURE_MIPSEL:-/home/q/ssh/out/nmap-mipsel}"
-FIX_ARM="${SB_FIXTURE_ARM:-/home/q/ssh/out/nmap-noneon}"
+[ -n "$FIX_MIPSEL" ] || note_no_fixture mipsel SB_FIXTURE_MIPSEL
+[ -n "$FIX_ARM" ] || note_no_fixture arm SB_FIXTURE_ARM
 
 if [ -f "$FIX_MIPSEL" ]; then
 	mk_cpuinfo ''

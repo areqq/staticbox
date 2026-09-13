@@ -45,6 +45,16 @@ below ARMv7 is soft-float because that is what those devices ship.
 sh tests/run-all.sh        # the suite; no network, builds nothing
 ```
 
+A few checks compare the gate and the detector against real foreign binaries,
+which the suite has no way to conjure. Point it at any static mipsel and 32-bit
+ARM binary to run them -- unpacking two of this repo's own release tarballs is
+the easy way:
+
+```sh
+SB_FIXTURE_MIPSEL=/tmp/m/bin/busybox SB_FIXTURE_ARM=/tmp/a/bin/busybox \
+	sh tests/run-all.sh
+```
+
 Needs `curl`, `tar`, `make`, `sha256sum`, `readelf` and `qemu-user-static`. The
 cross-compiler downloads itself.
 
