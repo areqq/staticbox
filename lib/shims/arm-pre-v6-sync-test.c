@@ -39,6 +39,35 @@ int main(void) {
 		for (unsigned i = 0; i < sizeof buf; i++)
 			if (&buf[i] != p) CHECK("neighbour byte intact", buf[i], 0xAA);
 	}
+	/* The word-sized read-modify-writes. A wrong return value here links
+	 * cleanly and corrupts an allocator's bookkeeping later, so check both
+	 * halves of the contract: what came back, and what is left in memory. */
+	{
+		int v = 10;
+		CHECK("fetch_and_add returns the old value", __sync_fetch_and_add(&v, 5), 10);
+		CHECK("fetch_and_add stored the sum", v, 15);
+		CHECK("fetch_and_sub returns the old value", __sync_fetch_and_sub(&v, 3), 15);
+		CHECK("fetch_and_sub stored the difference", v, 12);
+
+		v = 0xF0;
+		CHECK("fetch_and_and returns the old value", __sync_fetch_and_and(&v, 0x3C), 0xF0);
+		CHECK("fetch_and_and stored the conjunction", v, 0x30);
+		CHECK("fetch_and_or returns the old value", __sync_fetch_and_or(&v, 0x0F), 0x30);
+		CHECK("fetch_and_or stored the disjunction", v, 0x3F);
+		CHECK("fetch_and_xor returns the old value", __sync_fetch_and_xor(&v, 0xFF), 0x3F);
+		CHECK("fetch_and_xor stored the difference", v, 0xC0);
+
+		v = 7;
+		CHECK("lock_test_and_set returns the old value", __sync_lock_test_and_set(&v, 99), 7);
+		CHECK("lock_test_and_set stored the new value", v, 99);
+
+		v = 5;
+		CHECK("bool_compare_and_swap succeeds on a match", __sync_bool_compare_and_swap(&v, 5, 6), 1);
+		CHECK("and stored the new value", v, 6);
+		CHECK("bool_compare_and_swap fails on a mismatch", __sync_bool_compare_and_swap(&v, 5, 7), 0);
+		CHECK("and left the value alone", v, 6);
+	}
+
 	printf(fails ? "FAILURES: %d\n" : "all atomics checks passed\n", fails);
 	return fails != 0;
 }

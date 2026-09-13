@@ -119,11 +119,60 @@ dbt_sync_lock_test_and_set_1(volatile unsigned char *ptr, unsigned char newval)
 }
 
 /*
+ * Word-sized read-modify-write, all on the same primitive: read, compute,
+ * exchange, retry if someone got there first. Every one returns the value from
+ * before the operation, which is what the __sync_fetch_and_* contract says.
+ *
+ * These were added when nmap arrived: it is C++, and libc++'s own internals
+ * reach for __sync_fetch_and_add_4 and __sync_lock_test_and_set_4, which a
+ * plain C program never asked for.
+ */
+#define DBT_FETCH_OP(name, expr)                                    \
+	int                                                         \
+	dbt_sync_fetch_and_##name##_4(volatile int *ptr, int val)   \
+	{                                                           \
+		compiler_barrier();                                 \
+		for (;;) {                                          \
+			int old = *ptr;                             \
+			int new = (expr);                           \
+			if (kuser_cmpxchg(old, new, ptr) == 0) {    \
+				compiler_barrier();                 \
+				return old;                         \
+			}                                           \
+		}                                                   \
+	}
+
+DBT_FETCH_OP(add, old + val)
+DBT_FETCH_OP(sub, old - val)
+DBT_FETCH_OP(and, old & val)
+DBT_FETCH_OP(or,  old | val)
+DBT_FETCH_OP(xor, old ^ val)
+
+int
+dbt_sync_lock_test_and_set_4(volatile int *ptr, int newval)
+{
+	compiler_barrier();
+	for (;;) {
+		int old = *ptr;
+		if (kuser_cmpxchg(old, newval, ptr) == 0) {
+			compiler_barrier();
+			return old;
+		}
+	}
+}
+
+int
+dbt_sync_bool_compare_and_swap_4(volatile int *ptr, int oldval, int newval)
+{
+	return dbt_sync_val_compare_and_swap_4(ptr, oldval, newval) == oldval;
+}
+
+/*
  * The definitions above carry dbt_-prefixed names because clang refuses to let
  * a translation unit define a function it knows as a builtin ("cannot
  * redeclare builtin function", and -fno-builtin does not lift that). The
- * linker only cares about the symbol, so publish the three names it is looking
- * for as assembler-level aliases of those definitions.
+ * linker only cares about the symbol, so publish the names it is looking for
+ * as assembler-level aliases of those definitions.
  */
 __asm__(
 	".globl __sync_val_compare_and_swap_4\n"
@@ -132,4 +181,18 @@ __asm__(
 	".set   __sync_val_compare_and_swap_1, dbt_sync_val_compare_and_swap_1\n"
 	".globl __sync_lock_test_and_set_1\n"
 	".set   __sync_lock_test_and_set_1, dbt_sync_lock_test_and_set_1\n"
+	".globl __sync_lock_test_and_set_4\n"
+	".set   __sync_lock_test_and_set_4, dbt_sync_lock_test_and_set_4\n"
+	".globl __sync_bool_compare_and_swap_4\n"
+	".set   __sync_bool_compare_and_swap_4, dbt_sync_bool_compare_and_swap_4\n"
+	".globl __sync_fetch_and_add_4\n"
+	".set   __sync_fetch_and_add_4, dbt_sync_fetch_and_add_4\n"
+	".globl __sync_fetch_and_sub_4\n"
+	".set   __sync_fetch_and_sub_4, dbt_sync_fetch_and_sub_4\n"
+	".globl __sync_fetch_and_and_4\n"
+	".set   __sync_fetch_and_and_4, dbt_sync_fetch_and_and_4\n"
+	".globl __sync_fetch_and_or_4\n"
+	".set   __sync_fetch_and_or_4, dbt_sync_fetch_and_or_4\n"
+	".globl __sync_fetch_and_xor_4\n"
+	".set   __sync_fetch_and_xor_4, dbt_sync_fetch_and_xor_4\n"
 );
