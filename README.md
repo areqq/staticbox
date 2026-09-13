@@ -9,9 +9,13 @@ it actually contains before it is released.
 | package | what it is |
 |---|---|
 | `busybox` | 396 applets in one binary -- a working userland on a box whose own is from 2014 |
+| `curl` | with TLS, because almost everything worth fetching is https and the busybox wget on these boxes no longer negotiates with anything |
 | `dropbear` | SSH client and server plus key tools in one multi-call binary, and `scp` |
 | `dsvpn` | a ~100 kB VPN for devices with no `openvpn` |
+| `ffmpeg` | transcoding on the box, with `ffprobe`; built-in codecs only |
 | `nmap` | the scanner, `lean` without OpenSSL or `full` with it and libssh2 |
+| `rsync` | transfers only what changed, which is the point on a slow uplink |
+| `socat` | relays between anything and anything when nothing else is installed |
 | `speedtest` | an Ookla speedtest.net client |
 
 ## Getting a binary onto a device
