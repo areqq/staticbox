@@ -15,6 +15,8 @@
 
 set -eu
 
+# Read by lib/log.sh, which prefixes diagnostics with it.
+# shellcheck disable=SC2034
 SB_PROG='build'
 HERE="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
@@ -61,6 +63,7 @@ PKG_DIR="$PACKAGES_DIR/$PKG_NAME"
 # Defaults a meta may leave unset, cleared first so a previous package in the
 # same shell cannot leak into this one.
 TOOLCHAIN='zig'; TARGETS='all'; VARIANTS=''; SMOKE=''; SMOKE_EXPECT=''; REVISION='1'
+DEPS=''
 for _t in $(sb_targets_all); do eval "TOOLCHAIN_$(printf '%s' "$_t" | tr '-' '_')=''"; done
 # shellcheck disable=SC1090,SC1091
 . "$PKG_DIR/meta"
@@ -160,6 +163,39 @@ for TARGET in $BUILD_TARGETS; do
 
 		sb_fetch "$SOURCE" "$SHA256" "$CACHE_DIR/src" "$SRC" "$PKG_DIR/patches"
 
+		# Source dependencies, for a package that has to cross-build libraries
+		# of its own before it can build itself. nmap --full is the case: it
+		# needs OpenSSL and libssh2 cross-compiled and installed into a staging
+		# prefix before its own configure can find them.
+		#
+		# Declared in meta as DEPS (always) and DEPS_<variant> (for that
+		# variant only), with DEP_SOURCE_<name> and DEP_SHA256_<name> per
+		# entry. Each is unpacked to $SRC_<name>, and $DEP_PREFIX is the
+		# staging directory they install into.
+		DEP_PREFIX="$WORK/prefix"
+		rm -rf "$DEP_PREFIX"; mkdir -p "$DEP_PREFIX"
+		export DEP_PREFIX
+
+		dep_list="${DEPS:-}"
+		if [ -n "$VARIANT" ]; then
+			dep_extra=''
+			eval "dep_extra=\${DEPS_$VARIANT:-}"
+			dep_list="$dep_list $dep_extra"
+		fi
+		for dep in $dep_list; do
+			dep_src=''; dep_sha=''
+			eval "dep_src=\${DEP_SOURCE_$dep:-}"
+			eval "dep_sha=\${DEP_SHA256_$dep:-}"
+			[ -n "$dep_src" ] || die "$PKG_NAME/meta declares dep $dep with no DEP_SOURCE_$dep"
+			[ -n "$dep_sha" ] || die "$PKG_NAME/meta declares dep $dep with no DEP_SHA256_$dep"
+			dep_dir="$WORK/deps/$dep"
+			sb_fetch "$dep_src" "$dep_sha" "$CACHE_DIR/src" "$dep_dir" "$PKG_DIR/patches-$dep"
+			eval "SRC_$dep=\"\$dep_dir\""
+			eval "export SRC_$dep"
+		done
+		DEPS_RESOLVED="$dep_list"
+		export DEPS_RESOLVED
+
 		"$PKG_DIR/build.sh" || die "$PKG_NAME build.sh failed for $label"
 
 		# Every executable the recipe produced goes through the gate. A recipe
@@ -184,6 +220,20 @@ for TARGET in $BUILD_TARGETS; do
 			sb_verify "$bin" "$TARGET" $bin_smoke || die "verification failed for $bin"
 		done
 		[ "$found" = '1' ] || die "$PKG_NAME build.sh produced no executable in $OUT"
+
+		# The deep check, for properties the generic gate cannot know about:
+		# that nmap's full variant really linked OpenSSL, that a client really
+		# logs in. Optional, and bounded -- a hang under qemu-mipsel-static has
+		# happened twice in this codebase, both times on code that was correct
+		# on real hardware.
+		if [ -x "$PKG_DIR/verify.sh" ]; then
+			log "deep verify for $label"
+			if command -v timeout >/dev/null 2>&1; then
+				timeout 300 "$PKG_DIR/verify.sh" || die "$PKG_NAME verify.sh failed for $label"
+			else
+				"$PKG_DIR/verify.sh" || die "$PKG_NAME verify.sh failed for $label"
+			fi
+		fi
 
 		tarball="$(sb_pack "$OUT" "$OUT_DIR" "$PKG" "$VERSION" "$REVISION" "$TARGET" "$VARIANT")"
 		log "done: $tarball ($(du -h "$tarball" | cut -f1))"

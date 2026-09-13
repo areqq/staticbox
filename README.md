@@ -6,6 +6,14 @@ OpenWrt routers. Nothing here links against anything on the device.
 One recipe per tool, eight architectures, and every binary checked against what
 it actually contains before it is released.
 
+| package | what it is |
+|---|---|
+| `busybox` | 396 applets in one binary -- a working userland on a box whose own is from 2014 |
+| `dropbear` | SSH client and server plus key tools in one multi-call binary, and `scp` |
+| `dsvpn` | a ~100 kB VPN for devices with no `openvpn` |
+| `nmap` | the scanner, `lean` without OpenSSL or `full` with it and libssh2 |
+| `speedtest` | an Ookla speedtest.net client |
+
 ## Getting a binary onto a device
 
 ```sh

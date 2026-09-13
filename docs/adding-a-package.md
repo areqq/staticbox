@@ -30,6 +30,18 @@ That is a working binary. `SMOKE_EXPECT` names a string the program must print,
 which is what actually proves its own code ran rather than the loader failing
 or the CPU trapping. dsvpn uses this: it exits 254 and prints `DSVPN`.
 
+### Multiple binaries
+
+The gate runs on every executable a recipe leaves in `$OUT`, and one
+expectation rarely fits them all. `SMOKE_<name>` and `SMOKE_EXPECT_<name>`
+override the package-wide values for one binary, with dashes in the name
+spelled as underscores:
+
+```sh
+SMOKE_EXPECT='Dropbear SSH multi-purpose'
+SMOKE_EXPECT_scp='usage: scp'
+```
+
 ### Per-target backend
 
 A toolchain limitation is usually per (target, package), not per package:
@@ -56,10 +68,45 @@ VARIANTS='lean full'
 VARIANT_TARGETS_full='armv7-neon mipsel x86_64'
 ```
 
+### Source dependencies
+
+A package that has to cross-build libraries before it can build itself
+declares them as deps. nmap's `full` variant does:
+
+```sh
+DEPS_full='openssl libssh2'
+DEP_SOURCE_openssl=https://.../openssl-3.0.16.tar.gz
+DEP_SHA256_openssl=<sha256>
+DEP_SOURCE_libssh2=https://.../libssh2-1.11.0.tar.gz
+DEP_SHA256_libssh2=<sha256>
+```
+
+`DEPS` applies to every build; `DEPS_<variant>` only to that variant. Each is
+fetched, checksum-verified and unpacked to `$SRC_<name>`, and `$DEP_PREFIX` is
+a staging directory for them to install into. Patches go in
+`patches-<name>/`, not in `patches/`.
+
+## `packages/<name>/verify.sh`
+
+Optional, and run after the generic gate passes. It exists for properties the
+gate cannot know about.
+
+nmap's is the example worth copying: the gate proves the binary is for the
+right architecture and runs, but it cannot know that the `full` variant was
+supposed to contain OpenSSL and libssh2 -- and that is exactly what fails
+silently, because a full build whose configure quietly failed to find them
+still produces a working nmap, just one where every `ssl-*` and `ssh-*` script
+is gone.
+
+It gets `TARGET`, `VARIANT` and `OUT`, and is killed after five minutes. Keep
+it that way: a hang under `qemu-mipsel-static` has happened twice in this
+codebase, both times on code that was correct on real hardware.
+
 ## `packages/<name>/build.sh`
 
-Handed, ready to use: `TARGET VARIANT SRC WORK OUT` and
-`CC CXX AR RANLIB STRIP CFLAGS CXXFLAGS LDFLAGS`. The source at `$SRC` is
+Handed, ready to use: `TARGET VARIANT SRC WORK OUT`,
+`CC CXX AR RANLIB STRIP CFLAGS CXXFLAGS LDFLAGS`, and `SB_HOST_TRIPLE` for
+anything with an autoconf `--host`. The source at `$SRC` is
 already fetched, checksum-verified, unpacked and patched.
 
 Put the result in `$OUT` (a `bin/` subdirectory is conventional) and exit 0.

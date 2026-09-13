@@ -310,6 +310,12 @@ sb_tc_setup() {
 		AR="$sb__pfx-ar"; RANLIB="$sb__pfx-ranlib"; STRIP="$sb__pfx-strip"
 		# Bootlin names its tools <triple>-<tool>, so the prefix is the triple.
 		SB_HOST_TRIPLE="$(basename "$sb__pfx")"
+		# And the directory goes on PATH. Plenty of build systems call the
+		# compiler by bare name rather than through CC: OpenSSL's
+		# --cross-compile-prefix builds "<triple>-gcc" and runs it, and without
+		# this the whole build dies with "not found" partway through.
+		PATH="$(dirname "$sb__pfx"):$PATH"
+		export PATH
 		;;
 	go)
 		# Go cross-compiles itself: one toolchain, every target, no C compiler
