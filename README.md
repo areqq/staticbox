@@ -48,6 +48,11 @@ sh tests/run-all.sh        # the suite; no network, builds nothing
 Needs `curl`, `tar`, `make`, `sha256sum`, `readelf` and `qemu-user-static`. The
 cross-compiler downloads itself.
 
+## What went wrong before
+
+[docs/pitfalls.md](docs/pitfalls.md) collects the failures this repo has
+actually hit, and why none of them announced its cause.
+
 ## Adding a package
 
 See [docs/adding-a-package.md](docs/adding-a-package.md). Two files: a `meta`
