@@ -30,7 +30,12 @@ sb__zig_sha() {
 # splitting plus --gc-sections is what keeps these binaries small enough to
 # hand to a device with a few megabytes of flash.
 SB_COMMON_CFLAGS='-Os -ffunction-sections -fdata-sections'
-SB_COMMON_LDFLAGS='-static -Wl,--gc-sections'
+# -Wl,-s strips at link time. That is not merely a convenience: zig ships no
+# `strip`, and its objcopy --strip-all is unimplemented in 0.16, so there is no
+# cross-capable stripper guaranteed to exist on a build host. Doing it in the
+# linker removes the need for one. It keeps .ARM.attributes, which the ISA gate
+# reads, because those are non-alloc sections that -s does not touch.
+SB_COMMON_LDFLAGS='-static -Wl,--gc-sections -Wl,-s'
 
 # sb_tc_flags <target> <backend> -> the CFLAGS for that pair, on stdout.
 # Pure: touches no network and no filesystem, so it can be tested directly.
@@ -119,9 +124,26 @@ sb_tc_setup() {
 		printf '#!/bin/sh\nexec "%s" ranlib "$@"\n' "$sb__zig" > "$sb__w/ranlib"
 		chmod 755 "$sb__w/cc" "$sb__w/cxx" "$sb__w/ar" "$sb__w/ranlib"
 		CC="$sb__w/cc"; CXX="$sb__w/cxx"; AR="$sb__w/ar"; RANLIB="$sb__w/ranlib"
-		# zig has no `strip`; llvm-strip is arch-agnostic and `zig cc` already
-		# emits no debug info under -Os.
-		STRIP="$(command -v llvm-strip 2>/dev/null || command -v strip)"
+		# A cross-capable strip, or a documented no-op. The host's GNU strip is
+		# emphatically not an option: it refuses a foreign binary outright
+		# ("Unable to recognise the format of the input file"), which is how
+		# this first failed on a runner while passing on a developer machine
+		# that happened to have llvm-strip installed.
+		printf '%s\n' \
+			'#!/bin/sh' \
+			'# Cross strip for the zig backend.' \
+			'#' \
+			'# zig has no strip of its own and its objcopy --strip-all is' \
+			'# unimplemented in 0.16, so llvm-strip is used when the host has it.' \
+			'# When it does not, this is a no-op that succeeds: LDFLAGS carries' \
+			'# -Wl,-s, so the binary was already stripped at link time and a' \
+			'# recipe whose Makefile ends in a bare `strip` has nothing left to' \
+			'# do. Failing here instead would break those recipes for no gain.' \
+			'if command -v llvm-strip >/dev/null 2>&1; then exec llvm-strip "$@"; fi' \
+			'exit 0' \
+			> "$sb__w/strip"
+		chmod 755 "$sb__w/strip"
+		STRIP="$sb__w/strip"
 		;;
 	bootlin)
 		sb__pfx="$(sb__bootlin_fetch "$sb__cache/bootlin" "$SB_TARGET")"
