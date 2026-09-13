@@ -6,9 +6,19 @@
 # these binaries are handed to devices that cannot be inspected afterwards, so
 # "which bytes did this come from" has to have an answer.
 
-# sb_fetch <url> <sha256> <cache_dir> <dest_dir> [patch_dir]
+# sb_fetch <url...> <sha256> <cache_dir> <dest_dir> [patch_dir]
+#
+# The url argument may be a space-separated list, tried in order until one
+# downloads. A mirror costs nothing in trust here: the checksum decides whether
+# the bytes are right, so where they came from does not matter. This is not
+# hypothetical -- dropbear's own host answers GitHub runners with a Cloudflare
+# 525 while serving a developer machine perfectly well, and a build that works
+# locally and never in CI is worse than one that fails everywhere.
 sb_fetch() {
-	sb__url="$1"; sb__sha="$2"; sb__cache="$3"; sb__dest="$4"; sb__patches="${5:-}"
+	sb__urls="$1"; sb__sha="$2"; sb__cache="$3"; sb__dest="$4"; sb__patches="${5:-}"
+	# The cache filename comes from the first URL, so a fallback does not
+	# produce a second copy of identical bytes under a different name.
+	sb__url="${sb__urls%% *}"
 
 	case "$sb__sha" in
 		*[!0-9a-f]*|'') die "source checksum is missing or not lowercase hex: '$sb__sha'" ;;
@@ -20,7 +30,13 @@ sb_fetch() {
 	mkdir -p "$sb__cache"
 	if [ ! -f "$sb__file" ]; then
 		log "fetching $(basename "$sb__url")"
-		curl -fsSL -o "$sb__file" "$sb__url" || { rm -f "$sb__file"; die "download failed: $sb__url"; }
+		sb__got=0
+		for sb__u in $sb__urls; do
+			if curl -fsSL -o "$sb__file" "$sb__u"; then sb__got=1; break; fi
+			rm -f "$sb__file"
+			warn "download failed, trying the next source: $sb__u"
+		done
+		[ "$sb__got" = '1' ] || die "every source failed for $(basename "$sb__url")"
 	fi
 
 	# On a mismatch the cached file is removed. Leaving it there turns one bad

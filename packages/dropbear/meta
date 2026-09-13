@@ -5,7 +5,11 @@
 PKG=dropbear
 VERSION=2026.94
 REVISION=1
-SOURCE=https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2
+# Two sources, identical bytes -- the checksum below is what decides. The
+# upstream host answers GitHub runners with a Cloudflare 525 while serving a
+# developer machine fine, so the mirror is what makes this build reproducible
+# anywhere rather than only here.
+SOURCE='https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 https://dropbear.nl/mirror/releases/dropbear-2026.94.tar.bz2' 
 SHA256=e098034a843699200c8c977a991fff73159735bf795d5f72ef672c41a6b1ae81
 TOOLCHAIN=zig
 TARGETS=all
