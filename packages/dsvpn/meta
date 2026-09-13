@@ -8,7 +8,11 @@
 # build this replaces fetched `master` and verified nothing.
 PKG=dsvpn
 VERSION=0.1.5
-REVISION=1
+# r2: the binaries changed after r1 without the upstream version moving. The
+# toolchain grew a pipe() shim for MIPS o32, where zig's own returned the read
+# descriptor where the status code belongs, and the armv7 baseline became a
+# true VFPv3-D16 no-NEON build rather than one that still emitted VFPv4.
+REVISION=2
 SOURCE=https://github.com/jedisct1/dsvpn/archive/refs/tags/0.1.5.tar.gz
 SHA256=53c9ff2518acea188926a4f10d38929da7b61b6770d6ec00f73a4c82ff918c5e
 TOOLCHAIN=zig
