@@ -191,7 +191,7 @@ sb_tc_setup() {
 	# relative compiler path against the wrong place.
 	mkdir -p "$sb__cache"
 	sb__cache="$(CDPATH='' cd -- "$sb__cache" && pwd)"
-	SB_SHIM_OBJECTS=''; SB_SHIM_SOURCES=''
+	SB_SHIM_OBJECTS=''; SB_SHIM_SOURCES=''; SB_HOST_TRIPLE=''
 	CFLAGS="$(sb_tc_flags "$SB_TARGET" "$SB_BACKEND")" || die "cannot build flags for $SB_TARGET/$SB_BACKEND"
 	CXXFLAGS="$CFLAGS"
 	LDFLAGS="$SB_COMMON_LDFLAGS"
@@ -204,18 +204,37 @@ sb_tc_setup() {
 		ZIG_GLOBAL_CACHE_DIR="$sb__cache/zig/zig-cache"
 		export ZIG_GLOBAL_CACHE_DIR
 		sb__zt="$(sb_target_field "$SB_TARGET" zig_target)"
-		# Wrappers, not bare variables: the -target must reach every single
-		# object, including ones built by a configure script that rewrites
-		# CFLAGS. Putting it in CFLAGS alone has silently produced host
-		# objects before.
+		# Wrappers, not bare variables. Both the target and the CPU have to
+		# reach every single object, including ones built by a bundled library
+		# with its own rules that never sees our CFLAGS.
+		#
+		# The CPU half is not theoretical. Dropbear bundles libtomcrypt and
+		# libtommath, which compile with their own flags: with -mcpu only in
+		# CFLAGS the resulting binary came out encoded as mips32r2 -- caught
+		# here by the ISA gate, and on a BCM7356 it would have been an illegal
+		# instruction on real silicon. The same mistake cost sshd-tunnel a
+		# SIGILL on MIPS before the flag was moved into the wrapper there.
+		#
+		# It stays in CFLAGS as well, so what a recipe sees and what the
+		# MANIFEST records is the truth; a repeated -mcpu with the same value
+		# is harmless.
 		mkdir -p "$sb__cache/wrap/$SB_TARGET"
 		sb__w="$sb__cache/wrap/$SB_TARGET"
-		printf '#!/bin/sh\nexec "%s" cc -target %s "$@"\n' "$sb__zig" "$sb__zt" > "$sb__w/cc"
-		printf '#!/bin/sh\nexec "%s" c++ -target %s "$@"\n' "$sb__zig" "$sb__zt" > "$sb__w/cxx"
+		sb__zc="$(sb_target_field "$SB_TARGET" zig_cpu)"
+		printf '#!/bin/sh\nexec "%s" cc -target %s %s "$@"\n' "$sb__zig" "$sb__zt" "$sb__zc" > "$sb__w/cc"
+		printf '#!/bin/sh\nexec "%s" c++ -target %s %s "$@"\n' "$sb__zig" "$sb__zt" "$sb__zc" > "$sb__w/cxx"
 		printf '#!/bin/sh\nexec "%s" ar "$@"\n'     "$sb__zig" > "$sb__w/ar"
 		printf '#!/bin/sh\nexec "%s" ranlib "$@"\n' "$sb__zig" > "$sb__w/ranlib"
 		chmod 755 "$sb__w/cc" "$sb__w/cxx" "$sb__w/ar" "$sb__w/ranlib"
 		CC="$sb__w/cc"; CXX="$sb__w/cxx"; AR="$sb__w/ar"; RANLIB="$sb__w/ranlib"
+
+		# What autoconf's --host wants. Not the same string as zig's -target:
+		# config.sub has never heard of zig's "x86", so i686 has to be spelled
+		# the way the GNU world spells it.
+		SB_HOST_TRIPLE="$sb__zt"
+		case "$sb__zt" in
+			x86-linux-*) SB_HOST_TRIPLE="i686-linux-${sb__zt#x86-linux-}" ;;
+		esac
 
 		# Defects in zig's own C runtime, compensated here so that no recipe
 		# has to know about them. Both are linked as loose objects rather than
@@ -289,6 +308,8 @@ sb_tc_setup() {
 		sb__pfx="$(sb__bootlin_fetch "$sb__cache/bootlin" "$SB_TARGET")"
 		CC="$sb__pfx-gcc"; CXX="$sb__pfx-g++"
 		AR="$sb__pfx-ar"; RANLIB="$sb__pfx-ranlib"; STRIP="$sb__pfx-strip"
+		# Bootlin names its tools <triple>-<tool>, so the prefix is the triple.
+		SB_HOST_TRIPLE="$(basename "$sb__pfx")"
 		;;
 	go)
 		# Go cross-compiles itself: one toolchain, every target, no C compiler
@@ -315,5 +336,5 @@ sb_tc_setup() {
 	esac
 
 	export CC CXX AR RANLIB STRIP CFLAGS CXXFLAGS LDFLAGS SB_TARGET SB_BACKEND
-	export SB_SHIM_OBJECTS SB_SHIM_SOURCES
+	export SB_SHIM_OBJECTS SB_SHIM_SOURCES SB_HOST_TRIPLE
 }

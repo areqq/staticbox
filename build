@@ -127,6 +127,7 @@ else
 fi
 
 SB_SOURCE_SHA="$SHA256"
+SB_PKG_SMOKE_EXPECT="$SMOKE_EXPECT"
 export SB_SOURCE_SHA SMOKE_EXPECT
 
 for TARGET in $BUILD_TARGETS; do
@@ -145,6 +146,7 @@ for TARGET in $BUILD_TARGETS; do
 			fi
 		fi
 
+		SMOKE_EXPECT="$SB_PKG_SMOKE_EXPECT"
 		label="$TARGET${VARIANT:+/$VARIANT}"
 		log "building $PKG $VERSION for $label"
 
@@ -162,12 +164,22 @@ for TARGET in $BUILD_TARGETS; do
 
 		# Every executable the recipe produced goes through the gate. A recipe
 		# that shipped a stray host binary is caught here rather than on a box.
+		# A package with more than one binary needs more than one expectation:
+		# dropbear's scp prints its own usage, not dropbearmulti's banner. A
+		# meta can say SMOKE_<name> and SMOKE_EXPECT_<name> for a particular
+		# binary, with dashes in the name spelled as underscores; anything
+		# without an override falls back to the package-wide values.
 		found=0
 		for bin in "$OUT"/* "$OUT"/bin/*; do
 			[ -f "$bin" ] && [ -x "$bin" ] || continue
 			found=1
+			bin_key="$(basename "$bin" | tr '-' '_')"
+			eval "bin_smoke=\${SMOKE_$bin_key-\$SMOKE}"
+			eval "bin_expect=\${SMOKE_EXPECT_$bin_key-\$SMOKE_EXPECT}"
+			SMOKE_EXPECT="$bin_expect"
+			export SMOKE_EXPECT
 			# shellcheck disable=SC2086
-			sb_verify "$bin" "$TARGET" $SMOKE || die "verification failed for $bin"
+			sb_verify "$bin" "$TARGET" $bin_smoke || die "verification failed for $bin"
 		done
 		[ "$found" = '1' ] || die "$PKG_NAME build.sh produced no executable in $OUT"
 

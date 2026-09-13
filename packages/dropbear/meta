@@ -1,0 +1,17 @@
+# Dropbear: a small SSH client and server in one multi-call binary, plus scp.
+# The general-purpose build -- client, server, key tools, forwarding -- as
+# opposed to the credential-slot variant in sshd-tunnel, which bakes its keys
+# into the binary for one specific deployment.
+PKG=dropbear
+VERSION=2026.94
+REVISION=1
+SOURCE=https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2
+SHA256=e098034a843699200c8c977a991fff73159735bf795d5f72ef672c41a6b1ae81
+TOOLCHAIN=zig
+TARGETS=all
+
+# dropbearmulti with no arguments lists its applets and exits 1; scp prints
+# its own usage. Per-binary expectations, because one string cannot match both.
+SMOKE=''
+SMOKE_EXPECT='Dropbear SSH multi-purpose'
+SMOKE_EXPECT_scp='usage: scp'
