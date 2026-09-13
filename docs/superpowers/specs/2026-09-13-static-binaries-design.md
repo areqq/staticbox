@@ -71,7 +71,7 @@ w indeksie.
 | `x86_64` | `x86_64-linux-musl` | `x86-64--musl` | host, x86 OpenWrt, testy |
 | `i686` | `x86-linux-musl` `-mcpu=i686` | `x86-i686--musl` | stare x86 OpenWrt |
 | `armv5` | `arm-linux-musleabi` `-mcpu=arm926ej_s` | `armv5-eabi--musl` | Kirkwood, stare routery, DM800 |
-| `armv7` | `arm-linux-musleabihf` `-mcpu=cortex_a7-neon-d32` | `armv7-eabihf--musl` `-march=armv7-a -mfpu=vfpv3-d16` | wspólny mianownik ARM |
+| `armv7` | `arm-linux-musleabihf` `-mcpu=cortex_a9-neon-d32` | `armv7-eabihf--musl` `-march=armv7-a -mfpu=vfpv3-d16` | wspólny mianownik ARM |
 | `armv7-neon` | `arm-linux-musleabihf` `-mcpu=cortex_a15` | `armv7-eabihf--musl` `-mcpu=cortex-a15 -mfpu=neon-vfpv4` | VU+ Uno 4K SE, nowe STB |
 | `armv7-aes` | `arm-linux-musleabihf` `-mcpu=cortex_a53+aes` | `armv7-eabihf--musl` `-mcpu=cortex-a53+crypto` | ARM z AES w sprzęcie, userland 32-bit |
 | `aarch64` | `aarch64-linux-musl` | `aarch64--musl` | 64-bit STB/routery |
@@ -83,9 +83,12 @@ Decyzje i ich uzasadnienia:
 - **`mips32` r1, nie r2.** BCM7356/BMIPS5000 wywala illegal instruction na
   instrukcjach r2. Domyślny model CPU Ziga dla `mipsel` to r2 — musi być jawnie
   nadpisany.
-- **`armv7` jawnie odejmuje NEON i d32.** Sam `-mcpu=cortex_a7` w Zigu włącza
-  NEON i 32 rejestry D; boxy z A7 bez NEON-u wtedy dostają SIGILL. Baseline musi
-  być baseline.
+- **`armv7` to `cortex_a9` minus NEON i d32, nie `cortex_a7`.** Zmierzone przy
+  implementacji: `cortex_a7` minus te dwie cechy nadal emituje `Tag_FP_arch:
+  VFPv4-D16`, co trapuje na Cortex-A9 (tylko VFPv3); odjęcie jeszcze `vfp4`
+  w ogóle się nie kompiluje, bo `fma.c` musla ma inline asm wymagający VFP4,
+  wybierany na podstawie modelu CPU. `cortex_a9` minus NEON i d32 daje dokładnie
+  ARMv7-A / VFPv3-D16 / bez SIMD — czyli to, co znaczy wspólny mianownik.
 - **`armv5` i MIPS są soft-float** (`musleabi`, bez `hf`) — to ABI, które ma
   przytłaczająca większość tych urządzeń.
 - **`armv7-aes` jest na starcie wyłączony.** Wiersz istnieje w `targets.sh`
@@ -130,6 +133,14 @@ SMOKE='--version'              # czym sprawdzić, że binarka żyje
 `REVISION` istnieje, bo ta sama wersja upstreamu bywa przebudowywana po
 poprawce w przepisie — tag wydania to `<pkg>-v<VERSION>-r<REVISION>`.
 
+**Backend bywa wybierany per target, nie tylko per pakiet:** `TOOLCHAIN_<target>`,
+z myślnikiem zapisanym jako podkreślenie (`TOOLCHAIN_armv7_neon`). Powód wyszedł
+przy pierwszym pakiecie: zig 0.16 nie linkuje `armv5` dla żadnego programu, który
+woła `malloc` — jego własny alokator potrzebuje `__sync_*_1` i `__sync_*_4`,
+których compiler-rt nie dostarcza dla części pre-ARMv6 bez LDREX/STREX. gcc
+z Bootlina je ma, przez `__kuser_cmpxchg`. Ograniczenie toolchaina jest więc
+własnością pary (target, pakiet), nie samego pakietu.
+
 ### 4.2 `packages/<pkg>/build.sh`
 
 Dostaje w środowisku, gotowe do użycia:
@@ -155,7 +166,12 @@ linijki w `meta`, a nie przepisaniem skryptu.
   i cache'uje toolchain przy pierwszym użyciu, z przypiętą sumą SHA-256.
 - `lib/fetch.sh` — pobranie źródła do `src-cache/`, weryfikacja `SHA256`,
   rozpakowanie, nałożenie `patches/*.patch` w kolejności leksykalnej.
-- `lib/pack.sh` — `strip -s`, wygenerowanie `MANIFEST`, `tar.gz`, `.sha256`.
+- `lib/pack.sh` — wygenerowanie `MANIFEST`, `tar.gz`, `.sha256`. Strip **nie**
+  jest tu osobnym krokiem: `LDFLAGS` niesie `-Wl,-s`, więc linker robi to sam.
+  Powód: zig nie ma własnego `strip`, jego `objcopy --strip-all` jest w 0.16
+  niezaimplementowane, a GNU `strip` hosta odmawia obcej binarki wprost — build
+  przechodził lokalnie tylko dlatego, że maszyna deweloperska miała `llvm-strip`.
+  `-Wl,-s` nie rusza `.ARM.attributes`, więc bramka ISA ma nadal czym działać.
 - `lib/verify.sh` — bramka z §5.
 
 ## 5. Bramka weryfikacji
@@ -170,8 +186,10 @@ Dwa poziomy, oba przechodzone w CI **przed** utworzeniem Release.
    z kolumnami `elf_*` targetu.
 3. **Zgodność zestawu instrukcji** — bramka właściwa, różna per architektura:
    - **ARM:** `readelf -A` (atrybuty budowy). Dla `armv7` wymagany jest **brak**
-     `Tag_Advanced_SIMD_arch`, a `Tag_FP_arch` nie może przekraczać VFPv3-D16.
-     Dla `armv7-neon` `Tag_Advanced_SIMD_arch` musi być obecny.
+     `Tag_Advanced_SIMD_arch`, a `Tag_FP_arch` musi być pusty, `VFPv2` albo
+     `VFPv3-D16` — nic wyżej: VFPv4 trapuje na Cortex-A9, a samo `VFPv3` (bez
+     `-D16`) oznacza 32 rejestry D, których część z VFP D16 nie ma. Dla
+     `armv7-neon` `Tag_Advanced_SIMD_arch` musi być obecny.
    - **MIPS:** `readelf -h` — pole `Flags` musi zawierać `mips32`, nie `mips32r2`.
    - Uzasadnienie: **`qemu-arm-static -cpu cortex-a7` ma NEON w modelu QEMU**,
      więc binarka z NEON-em zbudowana jako baseline przejdzie test pod qemu
