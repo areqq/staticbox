@@ -2,7 +2,7 @@
 #
 # Sourced, never executed. Everything that needs to know which architectures
 # exist reads this file and nothing else: the build driver, the CI matrix
-# generator, detect.sh and the index generator. Adding an architecture is one
+# generator, install.sh and the index generator. Adding an architecture is one
 # new row here and no edit anywhere else.
 #
 # Columns, pipe-separated:

@@ -123,7 +123,7 @@ jobs:
           mkdir -p release
           find artifacts -type f \( -name '*.tar.gz' -o -name '*.sha256' \) \
             -exec cp {} release/ \;
-          cp detect.sh release/
+          cp install.sh release/
           ls -l release/
       - name: Create the release
         env:

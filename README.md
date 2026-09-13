@@ -21,13 +21,41 @@ it actually contains before it is released.
 ## Getting a binary onto a device
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/areqq/staticbox/main/detect.sh | sh
+wget -qO- https://raw.githubusercontent.com/areqq/staticbox/main/install.sh > /tmp/i.sh
+sh /tmp/i.sh
 ```
 
-prints the target name for that device. Release assets are named
-`<package>-<version>-<target>.tar.gz`, each with a `.sha256` beside it and a
-`MANIFEST` inside recording the compiler, the flags and the source checksum
-the binary was built from.
+It works out what the device is, lists what it can put there, and installs
+what you pick into `/tmp/staticbox`:
+
+```
+  device : mips  ->  mipsel  (MIPS32 r1, little-endian, soft-float)
+  install: /tmp/staticbox
+
+   1) busybox            1.37.0
+   2) curl               8.18.0
+   3) dropbear           2026.94
+   ...
+
+  which? (numbers, "a" for all, empty to quit): 1 3
+```
+
+Or skip the asking:
+
+```sh
+sh /tmp/i.sh busybox dropbear   # by name
+sh /tmp/i.sh --all              # everything for this device
+sh /tmp/i.sh --detect           # just print the target name
+sh /tmp/i.sh --list             # just show what is available
+```
+
+Piping it straight into `sh` shows the list and then explains how to choose:
+with the script on stdin there is no way to read an answer from there, and
+`/dev/tty` is not always available either.
+
+Release assets are named `<package>-<version>-<target>.tar.gz`, each with a
+`.sha256` beside it and a `MANIFEST` inside recording the compiler, the flags
+and the source checksum the binary was built from.
 
 ## Targets
 

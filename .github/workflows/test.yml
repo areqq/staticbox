@@ -30,7 +30,7 @@ jobs:
 
       - name: Lint every shell script
         run: |
-          shellcheck -s sh --severity=warning build detect.sh ci/matrix.sh ci/targets-doc.sh \
+          shellcheck -s sh --severity=warning build install.sh ci/matrix.sh ci/targets-doc.sh \
             lib/*.sh targets.sh packages/*/build.sh tests/*.sh
 
       - name: docs/targets.md matches targets.sh

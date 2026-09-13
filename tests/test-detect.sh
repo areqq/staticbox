@@ -2,7 +2,7 @@
 set -u
 HERE="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$HERE/lib.sh"
-DETECT="$HERE/../detect.sh"
+INSTALL="$HERE/../install.sh"
 
 TMP="${TMPDIR:-/tmp}/sb-detect-test.$$"
 rm -rf "$TMP"; mkdir -p "$TMP"
@@ -18,25 +18,25 @@ mk_cpuinfo() { printf 'Features\t: %s\n' "$1" > "$TMP/cpuinfo"; }
 if [ -f "$FIX_MIPSEL" ]; then
 	mk_cpuinfo ''
 	assert_eq 'little-endian MIPS is mipsel despite uname' \
-		"$(SB_FAKE_UNAME=mips sh "$DETECT" --probe "$FIX_MIPSEL" --cpuinfo "$TMP/cpuinfo")" 'mipsel'
+		"$(SB_FAKE_UNAME=mips sh "$INSTALL" --detect --probe "$FIX_MIPSEL" --cpuinfo "$TMP/cpuinfo")" 'mipsel'
 fi
 
 if [ -f "$FIX_ARM" ]; then
 	mk_cpuinfo 'half thumb fastmult vfp edsp'
 	assert_eq 'ARM without NEON falls to the baseline' \
-		"$(SB_FAKE_UNAME=armv7l sh "$DETECT" --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo")" 'armv7'
+		"$(SB_FAKE_UNAME=armv7l sh "$INSTALL" --detect --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo")" 'armv7'
 	mk_cpuinfo 'half thumb fastmult vfp edsp neon vfpv3'
 	assert_eq 'NEON promotes to armv7-neon' \
-		"$(SB_FAKE_UNAME=armv7l sh "$DETECT" --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo")" 'armv7-neon'
+		"$(SB_FAKE_UNAME=armv7l sh "$INSTALL" --detect --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo")" 'armv7-neon'
 	# armv7-aes is disabled in the matrix, so a box with AES must still be
 	# given a target that actually has builds.
 	mk_cpuinfo 'half thumb neon vfpv4 aes pmull'
 	assert_eq 'AES does not select a disabled target' \
-		"$(SB_FAKE_UNAME=armv7l sh "$DETECT" --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo")" 'armv7-neon'
+		"$(SB_FAKE_UNAME=armv7l sh "$INSTALL" --detect --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo")" 'armv7-neon'
 	# A 64-bit kernel under a 32-bit userland: trust the userland.
 	mk_cpuinfo 'neon'
 	assert_eq 'aarch64 kernel with a 32-bit userland gets an arm build' \
-		"$(SB_FAKE_UNAME=aarch64 sh "$DETECT" --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo")" 'armv7-neon'
+		"$(SB_FAKE_UNAME=aarch64 sh "$INSTALL" --detect --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo")" 'armv7-neon'
 fi
 
 if [ -f "$FIX_ARM" ]; then
@@ -44,23 +44,23 @@ if [ -f "$FIX_ARM" ]; then
 	# a package that only publishes the baseline build.
 	mk_cpuinfo 'neon vfpv3'
 	assert_eq 'a NEON box lists the neon build first' \
-		"$(SB_FAKE_UNAME=armv7l sh "$DETECT" --all --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo" | sed -n 1p)" 'armv7-neon'
+		"$(SB_FAKE_UNAME=armv7l sh "$INSTALL" --targets --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo" | sed -n 1p)" 'armv7-neon'
 	assert_eq 'and falls back to the baseline' \
-		"$(SB_FAKE_UNAME=armv7l sh "$DETECT" --all --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo" | sed -n 2p)" 'armv7'
+		"$(SB_FAKE_UNAME=armv7l sh "$INSTALL" --targets --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo" | sed -n 2p)" 'armv7'
 	mk_cpuinfo 'vfp'
 	assert_eq 'a non-NEON box lists only the baseline' \
-		"$(SB_FAKE_UNAME=armv7l sh "$DETECT" --all --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo" | wc -l | tr -d ' ')" '1'
+		"$(SB_FAKE_UNAME=armv7l sh "$INSTALL" --targets --probe "$FIX_ARM" --cpuinfo "$TMP/cpuinfo" | wc -l | tr -d ' ')" '1'
 fi
 
 mk_cpuinfo ''
-assert_eq 'x86_64 host' "$(SB_FAKE_UNAME=x86_64 sh "$DETECT" --probe /bin/true --cpuinfo "$TMP/cpuinfo")" 'x86_64'
-assert_fails env SB_FAKE_UNAME=vax sh "$DETECT" --probe /bin/true --cpuinfo "$TMP/cpuinfo"
+assert_eq 'x86_64 host' "$(SB_FAKE_UNAME=x86_64 sh "$INSTALL" --detect --probe /bin/true --cpuinfo "$TMP/cpuinfo")" 'x86_64'
+assert_fails env SB_FAKE_UNAME=vax sh "$INSTALL" --detect --probe /bin/true --cpuinfo "$TMP/cpuinfo"
 
 # Every name it can print must exist in the matrix, or it hands devices a URL
 # that 404s.
 . "$HERE/../targets.sh"
 for a in x86_64 armv7l aarch64 mips armv5tel i686; do
-	n="$(SB_FAKE_UNAME="$a" sh "$DETECT" --probe /bin/true --cpuinfo "$TMP/cpuinfo" 2>/dev/null)" || continue
+	n="$(SB_FAKE_UNAME="$a" sh "$INSTALL" --detect --probe /bin/true --cpuinfo "$TMP/cpuinfo" 2>/dev/null)" || continue
 	assert_ok sb_target_exists "$n"
 done
 

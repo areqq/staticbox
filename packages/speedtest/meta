@@ -14,7 +14,7 @@ TOOLCHAIN=go
 # No armv7-neon: Go's GOARM=7 has no NEON variant, so that build would be
 # byte-identical to armv7 -- verified, same SHA-256 -- and it could not satisfy
 # the NEON gate either, because Go emits no ARM build attributes at all. One
-# armv7 build serves both kinds of box; detect.sh --all degrades to it.
+# armv7 build serves both kinds of box; install.sh degrades to it.
 TARGETS='x86_64 i686 armv5 armv7 aarch64 mips mipsel'
 
 SMOKE='--version'
