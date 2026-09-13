@@ -28,6 +28,25 @@ FF_NM="$(command -v llvm-nm 2>/dev/null || command -v nm)"
 # the link line twice. Duplicated -Os is harmless; a duplicated object file is
 # not, and the toolchain's shim rides in LDFLAGS -- "duplicate symbol: pipe",
 # at the very first compiler test, which reads as "C compiler test failed".
+# ffmpeg probes for instruction-set extensions by assembling a .S file, and
+# clang's integrated assembler assembles those for the default architecture
+# whatever -mcpu says. On armv5 every probe passed and it built rev16 and
+# movt into the binary -- ARMv6 and ARMv6T2 instructions that an arm926ej-s
+# does not have. Naming the CPU makes ffmpeg set the level instead of asking.
+#
+# Naming the extensions the part lacks, rather than the CPU: ffmpeg's --cpu
+# truncates arm926ej-s at the dash and hands clang an "unknown CPU: arm926ej".
+#
+# Only the parts whose level the probes get wrong need this. An unknown target
+# stops the build rather than falling through to a silent default, because the
+# failure mode is a binary that runs everywhere except on the device.
+case "$TARGET" in
+	armv5)                           FF_EXT='--disable-armv6 --disable-armv6t2 --disable-neon --disable-vfp' ;;
+	armv7|armv7-neon|armv7-aes)      FF_EXT='' ;;
+	x86_64|i686|aarch64|mips|mipsel) FF_EXT='' ;;
+	*) printf 'ffmpeg: no instruction-set decision for target %s\n' "$TARGET" >&2; exit 1 ;;
+esac
+
 FF_CFLAGS="$CFLAGS"
 FF_LDFLAGS="$LDFLAGS"
 unset CFLAGS LDFLAGS
@@ -51,9 +70,11 @@ unset CFLAGS LDFLAGS
 # the ARM and MIPS assembly goes through the ordinary assembler, so the targets
 # these boxes actually are keep theirs. Anyone who wants the fast x86 build can
 # install nasm and drop this line.
+# shellcheck disable=SC2086  # $FF_EXT is a list of options, not one word
 ./configure \
 	--enable-cross-compile \
 	--arch="$FF_ARCH" \
+	$FF_EXT \
 	--target-os=linux \
 	--cross-prefix='' \
 	--cc="$CC" --cxx="$CXX" --ar="$AR" --ranlib="$RANLIB" --nm="$FF_NM" \

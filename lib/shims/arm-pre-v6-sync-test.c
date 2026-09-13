@@ -68,6 +68,31 @@ int main(void) {
 		CHECK("and left the value alone", v, 6);
 	}
 
+	/* Byte-sized and eight-byte paths. The eight-byte ones go through a
+	 * lock rather than a kernel helper, so check them the same way: what
+	 * came back, and what is left behind. */
+	{
+		unsigned char b = 10;
+		CHECK("fetch_and_add_1 returns the old value", __sync_fetch_and_add(&b, 5), 10);
+		CHECK("fetch_and_add_1 stored the sum", b, 15);
+		b = 0xF0;
+		CHECK("fetch_and_and_1 returns the old value", __sync_fetch_and_and(&b, 0x3C), 0xF0);
+		CHECK("fetch_and_and_1 stored the conjunction", b, 0x30);
+
+		long long w = 0x1122334455667788LL;
+		CHECK("val_compare_and_swap_8 matches", (int)(__sync_val_compare_and_swap(&w,
+			0x1122334455667788LL, 0x99LL) == 0x1122334455667788LL), 1);
+		CHECK("and stored the new value", (int)(w == 0x99LL), 1);
+		CHECK("fetch_and_add_8 returns the old value", (int)(__sync_fetch_and_add(&w, 1LL) == 0x99LL), 1);
+		CHECK("fetch_and_add_8 stored the sum", (int)(w == 0x9ALL), 1);
+		CHECK("lock_test_and_set_8 returns the old value",
+			(int)(__sync_lock_test_and_set(&w, 0x7766554433221100LL) == 0x9ALL), 1);
+		CHECK("lock_test_and_set_8 stored the new value", (int)(w == 0x7766554433221100LL), 1);
+		CHECK("bool_compare_and_swap_8 fails on a mismatch",
+			__sync_bool_compare_and_swap(&w, 0LL, 1LL), 0);
+		CHECK("and left the value alone", (int)(w == 0x7766554433221100LL), 1);
+	}
+
 	printf(fails ? "FAILURES: %d\n" : "all atomics checks passed\n", fails);
 	return fails != 0;
 }

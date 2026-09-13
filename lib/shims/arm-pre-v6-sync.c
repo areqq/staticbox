@@ -168,6 +168,117 @@ dbt_sync_bool_compare_and_swap_4(volatile int *ptr, int oldval, int newval)
 }
 
 /*
+ * Byte-sized read-modify-write, on the same masked-word approach as the byte
+ * compare-and-swap above.
+ */
+#define DBT_FETCH_OP_1(name, expr)                                            \
+	unsigned char                                                         \
+	dbt_sync_fetch_and_##name##_1(volatile unsigned char *ptr,            \
+	    unsigned char val)                                                \
+	{                                                                     \
+		volatile int *word = BYTE_WORD(ptr);                          \
+		unsigned int shift = BYTE_SHIFT(ptr);                         \
+		unsigned int mask = 0xffU << shift;                           \
+		compiler_barrier();                                           \
+		for (;;) {                                                    \
+			unsigned int old_word = (unsigned int)*word;          \
+			unsigned char old =                                   \
+			    (unsigned char)((old_word & mask) >> shift);       \
+			unsigned char new = (unsigned char)(expr);             \
+			unsigned int new_word = (old_word & ~mask) |          \
+			    ((unsigned int)new << shift);                     \
+			if (kuser_cmpxchg((int)old_word, (int)new_word,       \
+			    word) == 0) {                                     \
+				compiler_barrier();                           \
+				return old;                                   \
+			}                                                     \
+		}                                                             \
+	}
+
+DBT_FETCH_OP_1(add, old + val)
+DBT_FETCH_OP_1(sub, old - val)
+DBT_FETCH_OP_1(and, old & val)
+DBT_FETCH_OP_1(or,  old | val)
+DBT_FETCH_OP_1(xor, old ^ val)
+
+/*
+ * Eight-byte operations, which the kernel helper cannot do: __kuser_cmpxchg
+ * exchanges a word. __kuser_cmpxchg64 exists but only since Linux 3.1, and
+ * these parts run older kernels than that, so it is not an option here.
+ *
+ * A single global lock built on the 32-bit exchange is what GCC's own
+ * libatomic does for targets in this position, and it carries the same caveat:
+ * it is atomic only against other accesses that take the same lock. That holds
+ * here because the compiler routes every wide atomic on this target through
+ * these calls -- there is no instruction it could emit instead.
+ */
+static volatile int dbt_wide_lock;
+
+static void
+dbt_wide_acquire(void)
+{
+	while (dbt_sync_lock_test_and_set_4(&dbt_wide_lock, 1) != 0)
+		;
+	compiler_barrier();
+}
+
+static void
+dbt_wide_release(void)
+{
+	compiler_barrier();
+	dbt_wide_lock = 0;
+}
+
+#define DBT_FETCH_OP_8(name, expr)                                            \
+	long long                                                             \
+	dbt_sync_fetch_and_##name##_8(volatile long long *ptr, long long val) \
+	{                                                                     \
+		long long old;                                                \
+		dbt_wide_acquire();                                           \
+		old = *ptr;                                                   \
+		*ptr = (expr);                                                \
+		dbt_wide_release();                                           \
+		return old;                                                   \
+	}
+
+DBT_FETCH_OP_8(add, old + val)
+DBT_FETCH_OP_8(sub, old - val)
+DBT_FETCH_OP_8(and, old & val)
+DBT_FETCH_OP_8(or,  old | val)
+DBT_FETCH_OP_8(xor, old ^ val)
+
+long long
+dbt_sync_lock_test_and_set_8(volatile long long *ptr, long long newval)
+{
+	long long old;
+	dbt_wide_acquire();
+	old = *ptr;
+	*ptr = newval;
+	dbt_wide_release();
+	return old;
+}
+
+long long
+dbt_sync_val_compare_and_swap_8(volatile long long *ptr, long long oldval,
+    long long newval)
+{
+	long long actual;
+	dbt_wide_acquire();
+	actual = *ptr;
+	if (actual == oldval)
+		*ptr = newval;
+	dbt_wide_release();
+	return actual;
+}
+
+int
+dbt_sync_bool_compare_and_swap_8(volatile long long *ptr, long long oldval,
+    long long newval)
+{
+	return dbt_sync_val_compare_and_swap_8(ptr, oldval, newval) == oldval;
+}
+
+/*
  * The definitions above carry dbt_-prefixed names because clang refuses to let
  * a translation unit define a function it knows as a builtin ("cannot
  * redeclare builtin function", and -fno-builtin does not lift that). The
@@ -195,4 +306,30 @@ __asm__(
 	".set   __sync_fetch_and_or_4, dbt_sync_fetch_and_or_4\n"
 	".globl __sync_fetch_and_xor_4\n"
 	".set   __sync_fetch_and_xor_4, dbt_sync_fetch_and_xor_4\n"
+	".globl __sync_fetch_and_add_1\n"
+	".set   __sync_fetch_and_add_1, dbt_sync_fetch_and_add_1\n"
+	".globl __sync_fetch_and_add_8\n"
+	".set   __sync_fetch_and_add_8, dbt_sync_fetch_and_add_8\n"
+	".globl __sync_fetch_and_sub_1\n"
+	".set   __sync_fetch_and_sub_1, dbt_sync_fetch_and_sub_1\n"
+	".globl __sync_fetch_and_sub_8\n"
+	".set   __sync_fetch_and_sub_8, dbt_sync_fetch_and_sub_8\n"
+	".globl __sync_fetch_and_and_1\n"
+	".set   __sync_fetch_and_and_1, dbt_sync_fetch_and_and_1\n"
+	".globl __sync_fetch_and_and_8\n"
+	".set   __sync_fetch_and_and_8, dbt_sync_fetch_and_and_8\n"
+	".globl __sync_fetch_and_or_1\n"
+	".set   __sync_fetch_and_or_1, dbt_sync_fetch_and_or_1\n"
+	".globl __sync_fetch_and_or_8\n"
+	".set   __sync_fetch_and_or_8, dbt_sync_fetch_and_or_8\n"
+	".globl __sync_fetch_and_xor_1\n"
+	".set   __sync_fetch_and_xor_1, dbt_sync_fetch_and_xor_1\n"
+	".globl __sync_fetch_and_xor_8\n"
+	".set   __sync_fetch_and_xor_8, dbt_sync_fetch_and_xor_8\n"
+	".globl __sync_lock_test_and_set_8\n"
+	".set   __sync_lock_test_and_set_8, dbt_sync_lock_test_and_set_8\n"
+	".globl __sync_val_compare_and_swap_8\n"
+	".set   __sync_val_compare_and_swap_8, dbt_sync_val_compare_and_swap_8\n"
+	".globl __sync_bool_compare_and_swap_8\n"
+	".set   __sync_bool_compare_and_swap_8, dbt_sync_bool_compare_and_swap_8\n"
 );
