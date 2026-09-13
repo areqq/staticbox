@@ -5,6 +5,10 @@
 # Given: TARGET VARIANT SRC WORK OUT CC CXX AR RANLIB STRIP CFLAGS LDFLAGS
 set -eu
 
+# Helpers the driver cannot hand over through the environment: a recipe is a
+# separate process, so shell functions do not cross into it.
+. "$SB_LIB_DIR/log.sh"
+
 # Upstream's Makefile probes for -march=native/-mtune=native when CFLAGS is
 # empty, which is meaningless and wrong under cross-compilation. Passing CFLAGS
 # explicitly is what stops it.
@@ -28,7 +32,7 @@ ln -sf "$STRIP" "$WORK/shim/strip"
 	CFLAGS="$CFLAGS -Wall -DNO_DEFAULT_ROUTES" \
 	OPTFLAGS="$LDFLAGS" \
 	>"$WORK/make.log" 2>&1 ) \
-	|| { tail -20 "$WORK/make.log" >&2; exit 1; }
+	|| { sb_dump_log "$WORK/make.log"; exit 1; }
 
 [ -f "$SRC/dsvpn" ] || { printf 'dsvpn binary was not produced\n' >&2; exit 1; }
 

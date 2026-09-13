@@ -5,6 +5,10 @@
 #        SB_HOST_TRIPLE
 set -eu
 
+# Helpers the driver cannot hand over through the environment: a recipe is a
+# separate process, so shell functions do not cross into it.
+. "$SB_LIB_DIR/log.sh"
+
 cd "$SRC"
 
 # -Wno-error=date-time: socat stamps __DATE__ into its version string and the
@@ -25,10 +29,10 @@ cd "$SRC"
 	sc_cv_sys_tabdly_shift=10 \
 	sc_cv_sys_csize_shift=4 \
 	>"$WORK/configure.log" 2>&1 \
-	|| { tail -n 25 "$WORK/configure.log" >&2; exit 1; }
+	|| { sb_dump_log "$WORK/configure.log"; exit 1; }
 
 make -j"$(nproc 2>/dev/null || echo 2)" >"$WORK/make.log" 2>&1 \
-	|| { grep -iE 'error|undefined' "$WORK/make.log" | head -20 >&2; exit 1; }
+	|| { sb_dump_log "$WORK/make.log"; exit 1; }
 
 [ -f socat ] || { printf 'socat binary was not produced\n' >&2; exit 1; }
 

@@ -10,6 +10,10 @@
 # and the failure mode never names the cause.
 set -eu
 
+# Helpers the driver cannot hand over through the environment: a recipe is a
+# separate process, so shell functions do not cross into it.
+. "$SB_LIB_DIR/log.sh"
+
 JOBS="$(nproc 2>/dev/null || echo 2)"
 
 # MIPS32's missing 64-bit atomics come from the toolchain as SB_TARGET_LIBS
@@ -56,7 +60,7 @@ if [ "$VARIANT" = 'full' ]; then
 		>"$WORK/openssl-configure.log" 2>&1
 	  make -j"$JOBS" build_libs >"$WORK/openssl-make.log" 2>&1
 	  make install_dev >>"$WORK/openssl-make.log" 2>&1 ) \
-		|| { tail -n 25 "$WORK/openssl-make.log" "$WORK/openssl-configure.log" >&2; exit 1; }
+		|| { sb_dump_log "$WORK/openssl-make.log"; sb_dump_log "$WORK/openssl-configure.log"; exit 1; }
 
 	# ---------------------------------------------------------- libssh2
 	( cd "$SRC_libssh2"
@@ -67,7 +71,7 @@ if [ "$VARIANT" = 'full' ]; then
 		>"$WORK/libssh2-configure.log" 2>&1
 	  make -j"$JOBS" >"$WORK/libssh2-make.log" 2>&1
 	  make install >>"$WORK/libssh2-make.log" 2>&1 ) \
-		|| { tail -n 25 "$WORK/libssh2-make.log" "$WORK/libssh2-configure.log" >&2; exit 1; }
+		|| { sb_dump_log "$WORK/libssh2-make.log"; sb_dump_log "$WORK/libssh2-configure.log"; exit 1; }
 
 	CONF_CRYPTO="--with-openssl=$DEP_PREFIX --with-libssh2=$DEP_PREFIX"
 	NMAP_CPPFLAGS="-I$DEP_PREFIX/include"
@@ -91,7 +95,7 @@ export ac_cv_linux_vers=2
 	--with-libpcap=included --with-liblua=included --with-libpcre=included \
 	--with-libdnet=included --with-libz=included --without-subversion \
 	>"$WORK/configure.log" 2>&1 \
-	|| { tail -n 25 "$WORK/configure.log" >&2; exit 1; }
+	|| { sb_dump_log "$WORK/configure.log"; exit 1; }
 
 # The bundled libz and libpcap build a shared object as well as the archive.
 # Under -static that shared link fails on the non-PIC static CRT:
@@ -101,7 +105,7 @@ sed -i 's/^all: static.*/all: static/'            libz/Makefile
 sed -i 's/^all: libpcap.a shared/all: libpcap.a/' libpcap/Makefile
 
 make -j"$JOBS" >"$WORK/make.log" 2>&1 \
-	|| { grep -iE 'error|undefined' "$WORK/make.log" | head -25 >&2; exit 1; }
+	|| { sb_dump_log "$WORK/make.log"; exit 1; }
 
 [ -f nmap ] || { printf 'nmap binary was not produced\n' >&2; exit 1; }
 

@@ -6,6 +6,10 @@
 #        LDFLAGS SB_HOST_TRIPLE SB_TARGET_LIBS DEP_PREFIX SRC_openssl
 set -eu
 
+# Helpers the driver cannot hand over through the environment: a recipe is a
+# separate process, so shell functions do not cross into it.
+. "$SB_LIB_DIR/log.sh"
+
 JOBS="$(nproc 2>/dev/null || echo 2)"
 
 # ------------------------------------------------------------------ OpenSSL
@@ -47,7 +51,7 @@ OSSL_CC="$CC"
 	>"$WORK/openssl-configure.log" 2>&1
   make -j"$JOBS" build_libs >"$WORK/openssl-make.log" 2>&1
   make install_dev >>"$WORK/openssl-make.log" 2>&1 ) \
-	|| { tail -n 25 "$WORK/openssl-make.log" "$WORK/openssl-configure.log" >&2; exit 1; }
+	|| { sb_dump_log "$WORK/openssl-make.log"; sb_dump_log "$WORK/openssl-configure.log"; exit 1; }
 
 # --------------------------------------------------------------------- curl
 cd "$SRC"
@@ -70,7 +74,7 @@ cd "$SRC"
 	--disable-ldap --disable-ldaps \
 	LIBS="$SB_TARGET_LIBS" \
 	>"$WORK/configure.log" 2>&1 \
-	|| { tail -n 25 "$WORK/configure.log" >&2; exit 1; }
+	|| { sb_dump_log "$WORK/configure.log"; exit 1; }
 
 # -XCClinker is libtool's escape hatch: pass the next flag straight to the
 # linking compiler. It is needed because libtool eats a plain -static as one of
@@ -84,7 +88,7 @@ cd "$SRC"
 # cannot create executables".
 make -j"$JOBS" LDFLAGS="$LDFLAGS -XCClinker -static -L$DEP_PREFIX/lib" \
 	>"$WORK/make.log" 2>&1 \
-	|| { grep -iE 'error|undefined' "$WORK/make.log" | head -20 >&2; exit 1; }
+	|| { sb_dump_log "$WORK/make.log"; exit 1; }
 
 BIN='src/curl'
 [ -f "$BIN" ] || { printf 'curl binary was not produced\n' >&2; exit 1; }

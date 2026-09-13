@@ -9,6 +9,10 @@
 # this backend.
 set -eu
 
+# Helpers the driver cannot hand over through the environment: a recipe is a
+# separate process, so shell functions do not cross into it.
+. "$SB_LIB_DIR/log.sh"
+
 cd "$SRC"
 
 # -trimpath keeps the build reproducible by stripping the sandbox paths out of
@@ -16,7 +20,7 @@ cd "$SRC"
 # Dependencies come down verified against the module's own go.sum.
 "$GO" build -trimpath -ldflags '-s -w' -o "$WORK/speedtest" . \
 	>"$WORK/build.log" 2>&1 \
-	|| { tail -30 "$WORK/build.log" >&2; exit 1; }
+	|| { sb_dump_log "$WORK/build.log"; exit 1; }
 
 [ -f "$WORK/speedtest" ] || { printf 'speedtest binary was not produced\n' >&2; exit 1; }
 

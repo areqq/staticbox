@@ -5,6 +5,10 @@
 # Given: TARGET VARIANT SRC WORK OUT CC CXX AR RANLIB STRIP CFLAGS LDFLAGS
 set -eu
 
+# Helpers the driver cannot hand over through the environment: a recipe is a
+# separate process, so shell functions do not cross into it.
+. "$SB_LIB_DIR/log.sh"
+
 cd "$SRC"
 
 # HOSTCC has to stay the host's compiler: busybox builds several generators
@@ -95,7 +99,7 @@ fi
 
 make -j"$(nproc 2>/dev/null || echo 2)" HOSTCC=cc CC="$CC" \
 	SKIP_STRIP=y busybox >"$WORK/make.log" 2>&1 \
-	|| { tail -40 "$WORK/make.log" >&2; exit 1; }
+	|| { sb_dump_log "$WORK/make.log" 40; exit 1; }
 
 [ -f busybox ] || { printf 'busybox binary was not produced\n' >&2; exit 1; }
 

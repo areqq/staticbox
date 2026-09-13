@@ -6,6 +6,10 @@
 #        SB_HOST_TRIPLE
 set -eu
 
+# Helpers the driver cannot hand over through the environment: a recipe is a
+# separate process, so shell functions do not cross into it.
+. "$SB_LIB_DIR/log.sh"
+
 HERE="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
 # localoptions.h is only honoured in the build directory: the Makefile adds
@@ -31,12 +35,12 @@ JOBS="$(nproc 2>/dev/null || echo 2)"
 PROGS='dbclient dropbear dropbearkey dropbearconvert'
 
 make -j"$JOBS" PROGRAMS="$PROGS" MULTI=1 >"$WORK/make.log" 2>&1 \
-	|| { grep -iE 'error|undefined' "$WORK/make.log" | head -20 >&2; exit 1; }
+	|| { sb_dump_log "$WORK/make.log"; exit 1; }
 [ -f dropbearmulti ] || { printf 'dropbearmulti was not produced\n' >&2; exit 1; }
 
 # scp is not part of the multi-call binary upstream, so it is built on its own.
 make -j"$JOBS" scp >"$WORK/make-scp.log" 2>&1 \
-	|| { grep -iE 'error|undefined' "$WORK/make-scp.log" | head -20 >&2; exit 1; }
+	|| { sb_dump_log "$WORK/make-scp.log"; exit 1; }
 
 mkdir -p "$OUT/bin"
 cp dropbearmulti "$OUT/bin/dropbearmulti"

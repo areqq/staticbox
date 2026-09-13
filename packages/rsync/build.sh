@@ -5,6 +5,10 @@
 #        SB_HOST_TRIPLE
 set -eu
 
+# Helpers the driver cannot hand over through the environment: a recipe is a
+# separate process, so shell functions do not cross into it.
+. "$SB_LIB_DIR/log.sh"
+
 cd "$SRC"
 
 # Everything optional is off. rsync can link zlib, xxhash, zstd, lz4, openssl
@@ -33,10 +37,10 @@ cd "$SRC"
 	--disable-openssl --disable-md2man \
 	--disable-acl-support --disable-xattr-support \
 	>"$WORK/configure.log" 2>&1 \
-	|| { tail -n 25 "$WORK/configure.log" >&2; exit 1; }
+	|| { sb_dump_log "$WORK/configure.log"; exit 1; }
 
 make -j"$(nproc 2>/dev/null || echo 2)" >"$WORK/make.log" 2>&1 \
-	|| { grep -iE 'error|undefined' "$WORK/make.log" | head -20 >&2; exit 1; }
+	|| { sb_dump_log "$WORK/make.log"; exit 1; }
 
 [ -f rsync ] || { printf 'rsync binary was not produced\n' >&2; exit 1; }
 

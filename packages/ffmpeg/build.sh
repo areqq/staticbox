@@ -5,6 +5,10 @@
 #        LDFLAGS SB_HOST_TRIPLE
 set -eu
 
+# Helpers the driver cannot hand over through the environment: a recipe is a
+# separate process, so shell functions do not cross into it.
+. "$SB_LIB_DIR/log.sh"
+
 cd "$SRC"
 
 # ffmpeg wants its own name for the architecture. Taking it from the host
@@ -26,6 +30,12 @@ FF_NM="$(command -v llvm-nm 2>/dev/null || command -v nm)"
 # ffplay is not built: it needs SDL, which would be another cross-build for a
 # player nothing on a headless box would run.
 #
+# --disable-stripping because ffmpeg ends its link by running `strip`, and on a
+# cross build that is the host's, which refuses a foreign binary outright:
+# "Unable to recognise the format of the input file". x86_64 passed and every
+# other target failed, which is exactly what that looks like. Nothing is lost:
+# LDFLAGS carries -Wl,-s, so the linker has already stripped it.
+#
 # --disable-x86asm because ffmpeg's x86 assembly needs nasm, and requiring a
 # host assembler contradicts what this repo promises -- that a clean machine
 # needs only curl, tar and make. It costs SIMD speed on x86_64 and i686 only:
@@ -44,13 +54,14 @@ FF_NM="$(command -v llvm-nm 2>/dev/null || command -v nm)"
 	--prefix=/usr \
 	--disable-shared --enable-static \
 	--disable-doc --disable-debug --disable-ffplay \
+	--disable-stripping \
 	--disable-x86asm \
 	--disable-autodetect \
 	>"$WORK/configure.log" 2>&1 \
-	|| { tail -n 30 "$WORK/configure.log" >&2; exit 1; }
+	|| { sb_dump_log "$WORK/configure.log"; exit 1; }
 
 make -j"$(nproc 2>/dev/null || echo 2)" >"$WORK/make.log" 2>&1 \
-	|| { grep -iE 'error|undefined' "$WORK/make.log" | head -20 >&2; exit 1; }
+	|| { sb_dump_log "$WORK/make.log"; exit 1; }
 
 mkdir -p "$OUT/bin"
 for b in ffmpeg ffprobe; do
