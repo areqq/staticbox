@@ -13,8 +13,3 @@ TARGETS=all
 # 1. That is a working binary, so the banner is what proves it ran.
 SMOKE=''
 SMOKE_EXPECT='BusyBox'
-
-# Same reason as dsvpn: zig 0.16 cannot link armv5 once a program calls
-# malloc, because its allocator needs __sync_*_1 and __sync_*_4 that
-# compiler-rt does not provide for pre-ARMv6 parts without LDREX/STREX.
-TOOLCHAIN_armv5=bootlin

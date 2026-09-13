@@ -19,9 +19,3 @@ TARGETS=all
 # reached its own code is the banner.
 SMOKE=''
 SMOKE_EXPECT='DSVPN'
-
-# zig 0.16 cannot link armv5 for any program that calls malloc: its own
-# allocator (libzigc's SmpAllocator) needs __sync_*_1 and __sync_*_4, which
-# compiler-rt does not provide for pre-ARMv6 parts that have no LDREX/STREX.
-# Bootlin's gcc has them, routed through the kernel's __kuser_cmpxchg helper.
-TOOLCHAIN_armv5=bootlin

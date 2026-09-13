@@ -48,10 +48,50 @@ unset_cfg CONFIG_SHA256_HWACCEL
 # The architecture flags travel through the config, which is how busybox
 # threads them into every object including the ones its own Makefile builds
 # with its own rules.
+#
+# LDFLAGS deliberately does NOT go through the config. Makefile.flags does
+# `LDFLAGS += $(CONFIG_EXTRA_LDFLAGS)`, and make has already imported LDFLAGS
+# from the environment, so setting both puts every linker input on the command
+# line twice -- which surfaces as "duplicate symbol" for the toolchain's shim
+# objects rather than as anything that names the real cause.
 sed -i "s|^CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"$CFLAGS\"|" .config
-sed -i "s|^CONFIG_EXTRA_LDFLAGS=.*|CONFIG_EXTRA_LDFLAGS=\"$LDFLAGS\"|" .config
 
 make oldconfig HOSTCC=cc CC="$CC" >>"$WORK/config.log" 2>&1
+
+# The toolchain's shim objects cannot reach busybox through any flag variable,
+# so they are compiled as busybox's own objects instead.
+#
+# Why nothing simpler works. busybox is kbuild and links in two passes; its
+# partial-link flags are `filter-out -Wl,%, $(LDFLAGS)`, which keeps a bare
+# object path, so a shim left in LDFLAGS is folded into applets/built-in.o and
+# handed to the final link as well -- every symbol duplicated. Moving it to
+# LDLIBS fails differently: trylink rewrites each entry not starting with a
+# dash into -l<entry>, and an absolute path becomes an absolute system library.
+# The two spellings that would dodge kbuild's filter, -Wl,<object> and
+# -Wl,--start-lib, are both rejected by zig's lld as unsupported linker args.
+#
+# Compiled into libbb it lands in libbb/lib.a and is pulled exactly once.
+if [ -n "${SB_SHIM_SOURCES:-}" ]; then
+	for src in $SB_SHIM_SOURCES; do
+		base="$(basename "$src" .c)"
+		cp "$src" "libbb/$base.c"
+		{
+			printf '\n# staticbox toolchain shim, compiled here rather than linked in;\n'
+			printf '# see packages/busybox/build.sh for why no flag variable works.\n'
+			# -fno-builtin: clang refuses to let a translation unit define a
+			# function it knows as a builtin, which is exactly what the
+			# __sync_* helpers are.
+			printf 'CFLAGS_%s.o := -fno-builtin\n' "$base"
+			printf 'lib-y += %s.o\n' "$base"
+		} >> libbb/Kbuild.src
+	done
+
+	# And out of LDFLAGS, or the prebuilt object would still be linked in too.
+	for obj in $SB_SHIM_OBJECTS; do
+		LDFLAGS="$(printf '%s' "$LDFLAGS" | sed "s|$obj||")"
+	done
+	export LDFLAGS
+fi
 
 make -j"$(nproc 2>/dev/null || echo 2)" HOSTCC=cc CC="$CC" \
 	SKIP_STRIP=y busybox >"$WORK/make.log" 2>&1 \

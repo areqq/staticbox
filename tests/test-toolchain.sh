@@ -2,6 +2,9 @@
 set -u
 HERE="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$HERE/lib.sh"
+# Read by lib/toolchain.sh when it looks for the shim sources.
+# shellcheck disable=SC2034
+SB_LIB_DIR="$HERE/../lib"
 . "$HERE/../targets.sh"
 . "$HERE/../lib/log.sh"
 . "$HERE/../lib/toolchain.sh"

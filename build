@@ -18,6 +18,9 @@ set -eu
 SB_PROG='build'
 HERE="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
+SB_LIB_DIR="$HERE/lib"
+export SB_LIB_DIR
+
 . "$HERE/targets.sh"
 . "$HERE/lib/log.sh"
 . "$HERE/lib/toolchain.sh"
