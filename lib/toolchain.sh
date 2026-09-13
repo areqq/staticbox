@@ -191,7 +191,7 @@ sb_tc_setup() {
 	# relative compiler path against the wrong place.
 	mkdir -p "$sb__cache"
 	sb__cache="$(CDPATH='' cd -- "$sb__cache" && pwd)"
-	SB_SHIM_OBJECTS=''; SB_SHIM_SOURCES=''; SB_HOST_TRIPLE=''
+	SB_SHIM_OBJECTS=''; SB_SHIM_SOURCES=''; SB_HOST_TRIPLE=''; SB_TARGET_LIBS=''
 	CFLAGS="$(sb_tc_flags "$SB_TARGET" "$SB_BACKEND")" || die "cannot build flags for $SB_TARGET/$SB_BACKEND"
 	CXXFLAGS="$CFLAGS"
 	LDFLAGS="$SB_COMMON_LDFLAGS"
@@ -306,10 +306,48 @@ sb_tc_setup() {
 		;;
 	bootlin)
 		sb__pfx="$(sb__bootlin_fetch "$sb__cache/bootlin" "$SB_TARGET")"
-		CC="$sb__pfx-gcc"; CXX="$sb__pfx-g++"
 		AR="$sb__pfx-ar"; RANLIB="$sb__pfx-ranlib"; STRIP="$sb__pfx-strip"
+
+		# Wrapped for the same reason zig is: the architecture flags have to
+		# reach every invocation, including the link. libtool links programs
+		# without passing CFLAGS, so with -msoft-float only in CFLAGS the
+		# driver fell back to its hard-float default and pulled in a hard-float
+		# Scrt1.o -- visible as "curl uses -mhard-float ... libcurl.a uses
+		# -msoft-float" and, since Scrt1.o is the shared startup file, as a
+		# dynamically linked binary the gate then rejected.
+		mkdir -p "$sb__cache/wrap/$SB_TARGET"
+		sb__w="$sb__cache/wrap/$SB_TARGET"
+		sb__bf="$(sb_target_field "$SB_TARGET" bootlin_flags)"
+		printf '#!/bin/sh\nexec "%s-gcc" %s "$@"\n' "$sb__pfx" "$sb__bf" > "$sb__w/cc"
+		printf '#!/bin/sh\nexec "%s-g++" %s "$@"\n' "$sb__pfx" "$sb__bf" > "$sb__w/cxx"
+		chmod 755 "$sb__w/cc" "$sb__w/cxx"
+		CC="$sb__w/cc"; CXX="$sb__w/cxx"
 		# Bootlin names its tools <triple>-<tool>, so the prefix is the triple.
 		SB_HOST_TRIPLE="$(basename "$sb__pfx")"
+		# MIPS32 has no native 64-bit atomics and gcc emits calls to
+		# libatomic for them. It cannot go in LDFLAGS: autoconf puts LDFLAGS
+		# before the objects on its link line, and a library there is not
+		# scanned for references that appear later. SB_TARGET_LIBS is what a
+		# recipe passes as LIBS, which autoconf puts last.
+		#
+		# The archive is named by absolute path rather than as -latomic,
+		# because libtool resolves -latomic through the toolchain's
+		# libatomic.la to the shared object and then a forced static link dies
+		# with "attempted static link of dynamic object". An absolute .a goes
+		# through libtool and plain autoconf alike.
+		#
+		# zig's compiler-rt has these built in, so this is a bootlin-only need.
+		case "$SB_TARGET" in
+		mips|mipsel)
+			sb__atomic="$(dirname "$sb__pfx")/../$SB_HOST_TRIPLE/lib/libatomic.a"
+			if [ -f "$sb__atomic" ]; then
+				SB_TARGET_LIBS="$(CDPATH='' cd -- "$(dirname "$sb__atomic")" && pwd)/libatomic.a"
+			else
+				SB_TARGET_LIBS='-latomic'
+			fi
+			;;
+		esac
+
 		# And the directory goes on PATH. Plenty of build systems call the
 		# compiler by bare name rather than through CC: OpenSSL's
 		# --cross-compile-prefix builds "<triple>-gcc" and runs it, and without
@@ -342,5 +380,5 @@ sb_tc_setup() {
 	esac
 
 	export CC CXX AR RANLIB STRIP CFLAGS CXXFLAGS LDFLAGS SB_TARGET SB_BACKEND
-	export SB_SHIM_OBJECTS SB_SHIM_SOURCES SB_HOST_TRIPLE
+	export SB_SHIM_OBJECTS SB_SHIM_SOURCES SB_HOST_TRIPLE SB_TARGET_LIBS
 }

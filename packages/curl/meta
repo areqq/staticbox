@@ -1,0 +1,23 @@
+# curl, with TLS. Without it this would be of little use on a box: almost
+# everything worth fetching is https, and the wget in a 2014-era busybox
+# either has no TLS at all or has one that no longer negotiates with anything.
+#
+# OpenSSL is cross-built first, the same way nmap's full variant does it.
+PKG=curl
+VERSION=8.18.0
+REVISION=1
+SOURCE=https://curl.se/download/curl-8.18.0.tar.xz
+SHA256=40df79166e74aa20149365e11ee4c798a46ad57c34e4f68fd13100e2c9a91946
+# zig, not bootlin. Bootlin publishes no soft-float MIPS toolchain, so a
+# bootlin build of this is hard-float and takes SIGILL on a MIPS part without
+# an FPU -- which is what these boxes may well be. zig's mipsel-linux-musleabi
+# is soft-float and runs either way.
+TOOLCHAIN=zig
+TARGETS=all
+
+DEPS='openssl'
+DEP_SOURCE_openssl=https://github.com/openssl/openssl/releases/download/openssl-3.0.16/openssl-3.0.16.tar.gz
+DEP_SHA256_openssl=57e03c50feab5d31b152af2b764f10379aecd8ee92f16c985983ce4a99f7ef86
+
+SMOKE='--version'
+SMOKE_EXPECT='curl 8.18.0'

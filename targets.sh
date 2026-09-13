@@ -23,9 +23,21 @@
 #
 # Why some values are what they are:
 #
-#  * armv5, mips and mipsel are soft-float (musleabi, no "hf"). That is the ABI
-#    the overwhelming majority of these devices ship, and a float-ABI mismatch
-#    does not fail to link -- it dies with an illegal instruction on the device.
+#  * armv5, mips and mipsel are soft-float under zig (musleabi, no "hf"). That
+#    is the ABI the overwhelming majority of these devices ship, and a float-ABI
+#    mismatch does not fail to link -- it dies with an illegal instruction on
+#    the device.
+#
+#    The bootlin columns for mips and mipsel deliberately do NOT say
+#    -msoft-float, because Bootlin publishes no soft-float MIPS toolchain: its
+#    sysroot crt1.o is hard-float, and asking for soft-float objects against it
+#    produces "uses -mhard-float ... uses -msoft-float" and an ABI-mismatched
+#    binary. So a MIPS package built on bootlin is hard-float while the same
+#    target built on zig is soft-float. Each binary is fully static and
+#    self-consistent, so both run; on a part without an FPU the hard-float one
+#    pays kernel emulation for floating point, which for a scanner or a
+#    downloader is nothing. Worth knowing before moving a package between
+#    backends.
 #
 #  * armv7 is spelled cortex_a9-neon-d32, which is not a typo for a7. The
 #    baseline has to be the oldest ARMv7-A hard-float part these tools might
@@ -50,8 +62,8 @@ armv7|1|arm-linux-musleabihf|-mcpu=cortex_a9-neon-d32|armv7-eabihf|-march=armv7-
 armv7-neon|1|arm-linux-musleabihf|-mcpu=cortex_a15|armv7-eabihf|-mcpu=cortex-a15 -mfpu=neon-vfpv4 -mfloat-abi=hard|qemu-arm-static|cortex-a15|ELF32|LSB|ARM|arm-neon|arm|GOARM=7
 armv7-aes|0|arm-linux-musleabihf|-mcpu=cortex_a53+aes|armv7-eabihf|-mcpu=cortex-a53+crypto -mfloat-abi=hard|qemu-arm-static|cortex-a53|ELF32|LSB|ARM|arm-aes|arm|GOARM=7
 aarch64|1|aarch64-linux-musl||aarch64||qemu-aarch64-static||ELF64|LSB|AArch64|none|arm64|
-mips|1|mips-linux-musleabi|-mcpu=mips32|mips32|-march=mips32 -mabi=32 -msoft-float|qemu-mips-static|4Kc|ELF32|MSB|MIPS|mips32r1|mips|GOMIPS=softfloat
-mipsel|1|mipsel-linux-musleabi|-mcpu=mips32|mips32el|-march=mips32 -mabi=32 -msoft-float|qemu-mipsel-static|4Kc|ELF32|LSB|MIPS|mips32r1|mipsle|GOMIPS=softfloat'
+mips|1|mips-linux-musleabi|-mcpu=mips32|mips32|-march=mips32 -mabi=32|qemu-mips-static|4Kc|ELF32|MSB|MIPS|mips32r1|mips|GOMIPS=softfloat
+mipsel|1|mipsel-linux-musleabi|-mcpu=mips32|mips32el|-march=mips32 -mabi=32|qemu-mipsel-static|4Kc|ELF32|LSB|MIPS|mips32r1|mipsle|GOMIPS=softfloat'
 
 SB_TARGET_FIELDS='name enabled zig_target zig_cpu bootlin_tc bootlin_flags qemu qemu_cpu elf_class elf_data elf_machine isa_gate go_arch go_env'
 

@@ -1,0 +1,12 @@
+# rsync: the file transfer tool that only sends what changed. On a box with a
+# slow uplink that difference is the whole point.
+PKG=rsync
+VERSION=3.4.1
+REVISION=1
+SOURCE=https://download.samba.org/pub/rsync/src/rsync-3.4.1.tar.gz
+SHA256=2924bcb3a1ed8b551fc101f740b9f0fe0a202b115027647cf69850d65fd88c52
+TOOLCHAIN=zig
+TARGETS=all
+
+SMOKE='--version'
+SMOKE_EXPECT='rsync  version'

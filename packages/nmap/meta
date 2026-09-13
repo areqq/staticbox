@@ -6,16 +6,16 @@
 #            NSE scripts work. About ten minutes a target, so only where it is
 #            actually used.
 #
-# TOOLCHAIN=bootlin, not zig. This build is proven against Bootlin's gcc
-# through six separate failures (see build.sh), and porting a working build to
-# a different compiler is a task of its own rather than a precondition for
-# having nmap at all. Moving it is one line here when someone does that work.
+# zig, not bootlin, despite this build having been proven against Bootlin's gcc.
+# Bootlin publishes no soft-float MIPS toolchain, so a bootlin build is
+# hard-float and takes SIGILL on a MIPS part without an FPU. Keeping one float
+# ABI per target matters more than keeping the compiler this recipe grew up on.
 PKG=nmap
 VERSION=7.95
 REVISION=1
 SOURCE=https://nmap.org/dist/nmap-7.95.tar.bz2
 SHA256=e14ab530e47b5afd88f1c8a2bac7f89cd8fe6b478e22d255c5b9bddb7a1c5778
-TOOLCHAIN=bootlin
+TOOLCHAIN=zig
 TARGETS=all
 
 VARIANTS='lean full'

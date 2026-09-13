@@ -23,7 +23,14 @@ assert_contains 'mipsel/zig pins mips32'   "$(sb_tc_flags mipsel zig)" '-mcpu=mi
 
 # The bootlin backend uses gcc spellings, which differ from zig's.
 assert_contains 'mipsel/bootlin uses -march' "$(sb_tc_flags mipsel bootlin)" '-march=mips32'
-assert_contains 'mipsel/bootlin is softfp'   "$(sb_tc_flags mipsel bootlin)" '-msoft-float'
+# Bootlin's MIPS toolchains are hard-float and publish no soft-float variant,
+# so the matrix must NOT ask for soft-float there: an ABI-mismatched binary is
+# the result, and there is no way to get a matching soft-float one.
+case "$(sb_tc_flags mipsel bootlin)" in
+	*-msoft-float*) fail 'mipsel/bootlin must not claim soft-float' ;;
+	*) pass 'mipsel/bootlin does not claim soft-float' ;;
+esac
+assert_contains 'armv5/bootlin is softfp' "$(sb_tc_flags armv5 bootlin)" '-msoft-float'
 assert_contains 'armv7/bootlin caps the fpu' "$(sb_tc_flags armv7 bootlin)" '-mfpu=vfpv3-d16'
 
 assert_fails sb_tc_flags mipsel nosuchbackend

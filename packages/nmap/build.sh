@@ -12,12 +12,9 @@ set -eu
 
 JOBS="$(nproc 2>/dev/null || echo 2)"
 
-# MIPS32 has no native 64-bit atomics, so the linker asks for __atomic_* from
-# libatomic. Only nmap's own link needs it; the libraries below do not.
-EXTRA_LIBS=''
-case "$TARGET" in
-	mips|mipsel) EXTRA_LIBS='-latomic' ;;
-esac
+# MIPS32's missing 64-bit atomics come from the toolchain as SB_TARGET_LIBS
+# (-latomic there), passed as LIBS so autoconf places it after the objects.
+EXTRA_LIBS="$SB_TARGET_LIBS"
 
 CONF_CRYPTO='--without-openssl --without-libssh2'
 NMAP_CPPFLAGS=''
@@ -42,11 +39,20 @@ if [ "$VARIANT" = 'full' ]; then
 	#  * build_libs plus install_dev, never install_sw. The openssl application
 	#    is not wanted here and on MIPS32 it fails to link over __atomic_*
 	#    anyway; install_dev gives the headers, the .a files and the pkgconfig.
+	# Configured through CC rather than --cross-compile-prefix: the prefix
+	# option builds its own "<triple>-gcc" and calls it directly, which
+	# bypasses our compiler wrapper and leaves OpenSSL's objects at the
+	# toolchain's default ISA. Naming CC keeps every object on one compiler.
+	#
+	# no-threads because OpenSSL's threading layer calls __atomic_is_lock_free
+	# and __atomic_fetch_or_8, which on MIPS32 live in libatomic; nmap does not
+	# need OpenSSL to be thread-safe here.
 	( cd "$SRC_openssl"
-	  unset CC CXX AR RANLIB STRIP CFLAGS CXXFLAGS CPPFLAGS LDFLAGS
+	  unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS
 	  ./Configure linux-generic32 no-shared no-dso no-engine no-tests no-async \
+		no-threads \
 		--prefix="$DEP_PREFIX" --openssldir="$DEP_PREFIX/ssl" \
-		--cross-compile-prefix="$SB_HOST_TRIPLE-" \
+		CC="$CC" AR="$AR" RANLIB="$RANLIB" \
 		>"$WORK/openssl-configure.log" 2>&1
 	  make -j"$JOBS" build_libs >"$WORK/openssl-make.log" 2>&1
 	  make install_dev >>"$WORK/openssl-make.log" 2>&1 ) \
