@@ -13,6 +13,7 @@ it actually contains before it is released.
 | `dropbear` | SSH client and server plus key tools in one multi-call binary, and `scp` |
 | `dsvpn` | a ~100 kB VPN for devices with no `openvpn` |
 | `ffmpeg` | transcoding on the box, with `ffprobe`; built-in codecs only |
+| `ncat` | netcat with brokering, HTTP/SOCKS proxying, access control and `--lua-exec` |
 | `nmap` | the scanner, `lean` without OpenSSL or `full` with it and libssh2 |
 | `rsync` | transfers only what changed, which is the point on a slow uplink |
 | `socat` | relays between anything and anything when nothing else is installed |

@@ -1,0 +1,29 @@
+# ncat -- netcat as the nmap project rewrote it, and the reason to prefer it
+# over the busybox `nc` on a box: connection brokering (--broker), HTTP and
+# SOCKS4/5 proxying in both directions, access control (--allow/--deny),
+# --keep-open for a listener that survives its client, --exec/--sh-exec and,
+# because nmap's own Lua is built in, --lua-exec.
+#
+# Built from the nmap tarball, which is where ncat lives: same source, same
+# checksum, same cache entry as packages/nmap. Only `make build-ncat` is run,
+# so none of nmap's scanner, NSE data or OS database is compiled.
+#
+# No OpenSSL, deliberately. It costs about ten minutes a target to cross-build
+# and it buys --ssl and nothing else; everything above still works without it.
+# A box that needs TLS on a relay has curl, or socat, or can wrap this in
+# either. If --ssl is ever wanted here, this grows a `full` variant the way
+# nmap did rather than paying for TLS on all nine targets.
+#
+# zig, not bootlin, for the reason packages/nmap gives: Bootlin publishes no
+# soft-float MIPS toolchain, so a bootlin build is hard-float and takes SIGILL
+# on a MIPS part with no FPU.
+PKG=ncat
+VERSION=7.95
+REVISION=1
+SOURCE=https://nmap.org/dist/nmap-7.95.tar.bz2
+SHA256=e14ab530e47b5afd88f1c8a2bac7f89cd8fe6b478e22d255c5b9bddb7a1c5778
+TOOLCHAIN=zig
+TARGETS=all
+
+SMOKE='--version'
+SMOKE_EXPECT='Ncat: Version 7.95'
