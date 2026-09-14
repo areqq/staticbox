@@ -207,3 +207,43 @@ musl nor Bootlin's defines it, and `NO_REGEX` is the answer -- git then uses
 the compat regex it carries for exactly this case. Checked in the headers
 rather than inferred from a failed build, because the failure is a compile
 error in a file that looks like it has nothing to do with the C library.
+
+## A binary that lies about where it came from
+
+OpenVPN stamps a git revision into the version banner whenever configure finds
+itself inside a work tree. Unpacked under `.build`, it found *this* repository,
+and the binary announced itself as `OpenVPN 2.7.7 [git:main/e9096b8fb4cd...]`
+-- a staticbox commit, in the one string a person copies into a bug report.
+
+Nothing fails. The build is clean, the gate passes, and the provenance is
+false. `GIT_CEILING_DIRECTORIES` set to the work directory stops git walking
+out of the source tree, so configure concludes there is no checkout and the
+banner carries the release version alone.
+
+Worth checking in any recipe whose upstream cares about being built from git:
+the source is always unpacked inside this repository.
+
+## An unavoidable dependency with nowhere to download it
+
+OpenVPN 2.7 hard-fails configure on Linux without libcap-ng, and offers no
+`--disable` for it. libcap-ng stopped publishing dist tarballs after 0.8.5 in
+2021 and now ships git tags only, which carry no generated `configure`.
+
+So one of the two had to give: an old library, or autotools on the build host.
+The old library lost, because every release since 0.8.5 fixes `capng_change_id`
+-- supplementary groups and thread safety in 0.9.6, setpcap handling in 0.9.3 --
+and that is precisely the function OpenVPN calls. `autoconf`, `automake` and
+`libtool` are now needed to build this one package, and the README says so.
+
+## Choosing the crypto library is a build-time decision worth making
+
+OpenVPN builds against OpenSSL, mbedTLS or wolfSSL. mbedTLS cross-builds in
+about a minute where OpenSSL takes ten, which across this matrix is ten minutes
+a release against eighty, and the binary is smaller.
+
+It is not free: no PKCS#12, no `--capath`, X.509 usernames must be the CN, and
+the subject line handed to scripts is formatted differently. Inline `<ca>`,
+`<cert>` and `<key>` blocks -- what a .ovpn actually contains -- are unaffected.
+
+The same question is worth asking of anything here that reaches for OpenSSL out
+of habit.

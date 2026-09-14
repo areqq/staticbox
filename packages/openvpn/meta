@@ -1,0 +1,62 @@
+# OpenVPN, statically linked, with mbedTLS rather than OpenSSL.
+#
+# mbedTLS because it is the right trade here, not merely a smaller one: it
+# cross-builds in about a minute against OpenSSL's ten, which across this
+# matrix is the difference between ten minutes a release and eighty. The
+# binary is smaller with it too.
+#
+# What mbedTLS costs, from upstream's own README.mbedtls:
+#
+#   * no PKCS#12. A provider handing out a .p12 has to be unpacked into
+#     separate ca/cert/key first -- one openssl pkcs12 command, on a PC.
+#   * no --capath. --ca with a single file works; a directory of CAs does not.
+#   * X.509 alternative username fields must be CN.
+#   * the subject line handed to scripts and plugins is formatted differently
+#     than OpenSSL's, which matters only if something parses it.
+#
+# Inline <ca>, <cert>, <key> and <tls-crypt> blocks -- what almost every .ovpn
+# actually contains -- are unaffected.
+#
+# ONE BINARY, CLIENT AND SERVER. Not a choice made here: --disable-server was
+# removed from configure in OpenVPN 2.5 ("it is no longer possible to build a
+# client-/p2p-only OpenVPN binary -- the saving in code size no longer
+# outweighs the extra maintenance effort"), and --disable-client never existed.
+# Which role this runs in is decided by the config file, not by the build.
+PKG=openvpn
+VERSION=2.7.7
+REVISION=1
+# The release tarball from the project, not GitHub's archive: the latter has
+# no generated configure, and building it would need the full autotools chain
+# on every runner.
+SOURCE=https://swupdate.openvpn.net/community/releases/openvpn-2.7.7.tar.gz
+SHA256=3ab8f48fd6c26d49ba2333a092433949afdb5c85c0e6a1ff265784fbc04a2463
+TOOLCHAIN=zig
+TARGETS=all
+
+# 3.6.x is the LTS line, and 3.6.4 is the floor for TLS 1.3 support in
+# OpenVPN's mbedTLS backend -- below it the tunnel still works, at TLS 1.2.
+# Not 4.x: OpenVPN's support for it is new and its own changelog still talks
+# about translating algorithm identifiers.
+DEPS='mbedtls libcapng'
+DEP_SOURCE_mbedtls=https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.7/mbedtls-3.6.7.tar.bz2
+DEP_SHA256_mbedtls=a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6
+
+# libcap-ng is not optional and not avoidable: on Linux OpenVPN 2.7 hard-fails
+# configure without it, with no --disable to offer. It is what drops privileges
+# when a config says --user/--group.
+#
+# This is the one recipe here that needs autotools on the build host. Upstream
+# stopped publishing dist tarballs after 0.8.5 (2021) and now ships only git
+# tags, which carry no generated configure. 0.8.5 was the alternative and was
+# rejected: every release since fixes capng_change_id, which is precisely the
+# function OpenVPN calls -- supplementary groups in 0.9.6, thread safety in
+# 0.9.6, setpcap handling in 0.9.3.
+DEP_SOURCE_libcapng=https://github.com/stevegrubb/libcap-ng/archive/refs/tags/v0.9.6.tar.gz
+DEP_SHA256_libcapng=399040138e0ca62fa2bcabd63da9af4431a246ef7a654561a0ca3cb00010a539
+
+SMOKE='--version'
+SMOKE_EXPECT='OpenVPN 2.7.7'
+
+# UNVERIFIED ON REAL HARDWARE: /dev/net/tun. Without the tun driver in the
+# box's kernel openvpn cannot create an interface, and no binary can supply
+# one. The same caveat packages/wireguard-go carries, for the same reason.

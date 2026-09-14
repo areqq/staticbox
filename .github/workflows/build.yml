@@ -56,7 +56,13 @@ jobs:
       - name: Install host build tools
         run: |
           sudo apt-get update -qq
+          # autoconf/automake/libtool are for packages/openvpn alone: its
+          # libcap-ng dependency publishes no dist tarball any more, only git
+          # tags with no generated configure. Installed for every job because
+          # the matrix is computed at run time and this step cannot know which
+          # package it is about to build.
           sudo apt-get install -y -qq build-essential bzip2 xz-utils file \
+            autoconf automake libtool \
             qemu-user-static >/dev/null
 
       # Only the compiled musl and compiler-rt for this target are worth
