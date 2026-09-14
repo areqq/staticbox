@@ -247,3 +247,21 @@ the subject line handed to scripts is formatted differently. Inline `<ca>`,
 
 The same question is worth asking of anything here that reaches for OpenSSL out
 of habit.
+
+## A tag push is a denial-of-service against your own upstreams
+
+Pushing three release tags in a row, on top of a push to main that rebuilds
+everything, started somewhere north of a hundred runner jobs inside a minute.
+Every one of them reached for a source tarball, most of them from GitHub, and
+GitHub answered several with `504`. Five jobs died across three releases --
+`wireguard-go armv5`, `wireguard-tools` on two targets, `openvpn` on two more
+-- none of them for any reason to do with the code.
+
+`sb_fetch` had no retry: one bad second lost a job. It now passes `--retry 5
+--retry-delay 2` to curl, whose retry set is 408, 429 and 5xx, so a real 404
+still fails at once and the next mirror is tried without waiting.
+
+Mirrors do not help here, which is worth understanding. `SOURCE` takes a list
+because a checksum decides whether the bytes are right -- but that also means
+every mirror has to serve the *identical* archive. For a GitHub tag tarball
+there is no second host that does.

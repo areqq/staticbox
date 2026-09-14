@@ -32,7 +32,15 @@ sb_fetch() {
 		log "fetching $(basename "$sb__url")"
 		sb__got=0
 		for sb__u in $sb__urls; do
-			if curl -fsSL -o "$sb__file" "$sb__u"; then sb__got=1; break; fi
+			# --retry covers exactly the failure this has hit: a tag push
+			# starts every job at once, a hundred of them reach for the same
+			# host in the same second, and it answers 504. curl's retry set is
+			# 408, 429 and 5xx, so a genuine 404 still fails immediately and
+			# the next mirror is tried without delay. Five attempts two
+			# seconds apart costs at most ten seconds before giving up on a
+			# URL, against a job lost to one bad second.
+			if curl -fsSL --retry 5 --retry-delay 2 --retry-max-time 120 \
+				-o "$sb__file" "$sb__u"; then sb__got=1; break; fi
 			rm -f "$sb__file"
 			warn "download failed, trying the next source: $sb__u"
 		done
