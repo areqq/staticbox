@@ -1,0 +1,26 @@
+# wireguard-tools: the `wg` tool -- the half of WireGuard that configures a
+# tunnel. Generates keys, sets peers and endpoints, and shows what a running
+# interface is doing.
+#
+# It talks to two things and needs neither at build time: the kernel module
+# over netlink where the box has one, and the UNIX socket in /var/run/wireguard
+# that packages/wireguard-go listens on where it does not. So this one binary
+# drives either implementation.
+#
+# No libraries at all on Linux -- src/Makefile adds LDLIBS only for FreeBSD,
+# Haiku and Windows -- and the kernel headers it needs are bundled in
+# src/uapi/linux, so nothing here depends on the build host's kernel.
+#
+# wg-quick is not built: it is bash rather than ash, and it calls iproute2 and
+# resolvconf. The three commands in README-WIREGUARD-TOOLS do the same job with
+# what these boxes actually have.
+PKG=wireguard-tools
+VERSION=1.0.20260223
+REVISION=1
+SOURCE=https://github.com/WireGuard/wireguard-tools/archive/refs/tags/v1.0.20260223.tar.gz
+SHA256=859f8af03702db5e5c43f8ece77f5ebef40a2f4627c3e03997a031d4940ea9bc
+TOOLCHAIN=zig
+TARGETS=all
+
+SMOKE='--version'
+SMOKE_EXPECT='wireguard-tools v1.0.20260223'
