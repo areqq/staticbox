@@ -19,6 +19,8 @@ it actually contains before it is released.
 | `rsync` | transfers only what changed, which is the point on a slow uplink |
 | `socat` | relays between anything and anything when nothing else is installed |
 | `speedtest` | an Ookla speedtest.net client |
+| `wireguard-go` | the WireGuard daemon in userspace, for a box whose kernel has no module |
+| `wireguard-tools` | `wg`, which configures a tunnel -- needed by the above, and by the kernel module |
 
 ## Getting a binary onto a device
 

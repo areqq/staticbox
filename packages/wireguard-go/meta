@@ -1,0 +1,38 @@
+# wireguard-go: the userspace WireGuard daemon, in Go. Fully static without
+# asking, because CGO is off on this backend.
+#
+# This is the half that moves packets. It creates the tun interface and then
+# waits: every key, peer and endpoint is configured over a UNIX socket at
+# /var/run/wireguard/<iface>.sock, and nothing in this binary can write to that
+# socket. The `wg` tool does, and it is the packages/wireguard-tools half --
+# read out of main.go, which has no configuration parser at all.
+#
+# Two packages rather than one because the backend is per package: the go
+# backend blanks CC (lib/toolchain.sh), so a Go daemon and a C tool cannot come
+# out of the same recipe. They are separate upstreams with separate versions
+# anyway.
+PKG=wireguard-go
+VERSION=0.0.20250522
+REVISION=1
+SOURCE=https://github.com/WireGuard/wireguard-go/archive/refs/tags/0.0.20250522.tar.gz
+SHA256=70d0448d289a691978920f615c687864c3d7b0379d6f974e4f3590487dff35f7
+TOOLCHAIN=go
+# No armv7-neon, for the reason packages/speedtest gives: Go's GOARM=7 has no
+# NEON variant, so that build would be byte-identical to armv7, and it could
+# not satisfy the NEON gate either because Go emits no ARM build attributes.
+# One armv7 build serves both kinds of box; install.sh degrades to it.
+TARGETS='x86_64 i686 armv5 armv7 aarch64 mips mipsel'
+
+SMOKE='--version'
+SMOKE_EXPECT='wireguard-go v0.0.20250522'
+
+# UNVERIFIED ON REAL HARDWARE, twice over:
+#
+#  * /dev/net/tun. Without the tun driver in the box's kernel this daemon
+#    cannot create an interface and there is nothing the binary can do about
+#    it. Most Enigma2 and OpenWrt kernels have it; yours is the one that counts.
+#  * Go's kernel floor. The same caveat packages/speedtest carries: Go's
+#    documented minimum is newer than the 2.6.32 a VU+ Solo2 runs, and qemu
+#    cannot answer the question because it services syscalls from the host
+#    kernel. If it fails there, the way out is a C WireGuard -- the kernel
+#    module where the box has one, or boringtun.
