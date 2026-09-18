@@ -265,3 +265,19 @@ Mirrors do not help here, which is worth understanding. `SOURCE` takes a list
 because a checksum decides whether the bytes are right -- but that also means
 every mirror has to serve the *identical* archive. For a GitHub tag tarball
 there is no second host that does.
+
+## pkg-config answers for the build host, not the target
+
+wget's configure asks pkg-config whether libidn2 is available. On a runner with
+libidn2 installed the answer is yes -- about the *build machine* -- so
+configure enables IRI support, and the cross compile then dies on a missing
+`idn2.h` because no libidn2 was ever built for the target.
+
+The failure names a header, which points at the sysroot and away from the
+cause. Nothing in the message suggests a probe answered the wrong question.
+
+`--disable-iri` settles it, and the same class of trap is waiting in any
+configure that reaches for pkg-config: the answer describes the host unless
+PKG_CONFIG_LIBDIR is pointed somewhere else. Where a library really is wanted,
+the way through is the one packages/openvpn uses -- set the module's own
+`*_CFLAGS` and `*_LIBS`, which makes PKG_CHECK_MODULES skip the probe entirely.

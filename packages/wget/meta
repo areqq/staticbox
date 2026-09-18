@@ -1,0 +1,29 @@
+# GNU wget, statically linked, with TLS.
+#
+# curl is already here, so what this adds is the thing curl does not do:
+# recursion. -r, -m, --convert-links and --page-requisites pull a tree rather
+# than a file. The second reason is compatibility -- plenty of what runs on
+# these boxes shells out to `wget`, with wget's flags and wget's output, and
+# the busybox wget it finds there either has no TLS or has one that no longer
+# negotiates with anything.
+#
+# OpenSSL rather than GnuTLS, and not for the reason packages/openvpn picked
+# mbedTLS: wget 1.x has no mbedTLS backend at all. The choice here is OpenSSL,
+# which this repo already cross-builds four times over, against GnuTLS, which
+# would drag in nettle, gmp and libtasn1 first.
+PKG=wget
+VERSION=1.25.0
+REVISION=1
+SOURCE=https://ftp.gnu.org/gnu/wget/wget-1.25.0.tar.gz
+SHA256=766e48423e79359ea31e41db9e5c289675947a7fcf2efdcedb726ac9d0da3784
+TOOLCHAIN=zig
+TARGETS=all
+
+DEPS='zlib openssl'
+DEP_SOURCE_zlib=https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
+DEP_SHA256_zlib=9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
+DEP_SOURCE_openssl=https://github.com/openssl/openssl/releases/download/openssl-3.0.16/openssl-3.0.16.tar.gz
+DEP_SHA256_openssl=57e03c50feab5d31b152af2b764f10379aecd8ee92f16c985983ce4a99f7ef86
+
+SMOKE='--version'
+SMOKE_EXPECT='GNU Wget 1.25.0'
