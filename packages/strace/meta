@@ -1,0 +1,19 @@
+# strace: what a process is actually asking the kernel for.
+#
+# The tool for questions a log cannot answer -- which file enigma2 opened and
+# did not find, which ioctl the tuner driver rejected, where a plugin hangs.
+# busybox has nothing like it, and on a box with no compiler and no debugger
+# it is often the only way in.
+#
+# No libraries: stack unwinding (libunwind or libdw) is the only thing strace
+# links against beyond libc, and it is off here -- see build.sh.
+PKG=strace
+VERSION=7.2
+REVISION=1
+SOURCE=https://github.com/strace/strace/releases/download/v7.2/strace-7.2.tar.xz
+SHA256=4bde6246926890dcee824f6e6ac42a06752f47d77e5097d86e3c0d6d4b709fe5
+TOOLCHAIN=zig
+TARGETS=all
+
+SMOKE='--version'
+SMOKE_EXPECT='strace -- version 7.2'
