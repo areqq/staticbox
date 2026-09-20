@@ -9,17 +9,21 @@ it actually contains before it is released.
 | package | what it is |
 |---|---|
 | `busybox` | 396 applets in one binary -- a working userland on a box whose own is from 2014 |
+| `croc` | send a file to another machine with a phrase, through NAT, encrypted |
 | `curl` | with TLS, because almost everything worth fetching is https and the busybox wget on these boxes no longer negotiates with anything |
 | `dropbear` | SSH client and server plus key tools in one multi-call binary, and `scp` |
 | `dsvpn` | a ~100 kB VPN -- a fraction of `openvpn`, but it only talks to another `dsvpn` |
 | `ffmpeg` | transcoding on the box, with `ffprobe`; built-in codecs only |
 | `git` | clone and push over https and ssh, with its helpers and templates; relocatable |
+| `iperf3` | throughput on your own network, which is the half `speedtest` cannot see |
 | `ncat` | netcat with brokering, HTTP/SOCKS proxying, access control and `--lua-exec` |
 | `nmap` | the scanner, `lean` without OpenSSL or `full` with it and libssh2 |
 | `openvpn` | client and server in one binary, built against mbedTLS rather than OpenSSL |
 | `rsync` | transfers only what changed, which is the point on a slow uplink |
 | `socat` | relays between anything and anything when nothing else is installed |
 | `speedtest` | an Ookla speedtest.net client |
+| `strace` | which syscall a stuck or crashing process is actually making |
+| `tcpdump` | what is on the wire: is the stream arriving, is the box even asking |
 | `wget` | recursive mirroring, which `curl` cannot do, with working TLS |
 | `wireguard-go` | the WireGuard daemon in userspace, for a box whose kernel has no module |
 | `wireguard-tools` | `wg`, which configures a tunnel -- needed by the above, and by the kernel module |
@@ -89,10 +93,11 @@ SB_FIXTURE_MIPSEL=/tmp/m/bin/busybox SB_FIXTURE_ARM=/tmp/a/bin/busybox \
 	sh tests/run-all.sh
 ```
 
-Needs `curl`, `tar`, `make`, `sha256sum`, `readelf` and `qemu-user-static`,
-plus `autoconf`, `automake` and `libtool` if you build `openvpn` -- its
-libcap-ng dependency ships only a git tag with no generated `configure`. The
-cross-compiler downloads itself.
+Needs `curl`, `tar`, `make`, `sha256sum`, `readelf` and `qemu-user-static`.
+Two packages want more: `openvpn` needs `autoconf`, `automake` and `libtool`,
+because its libcap-ng dependency ships only a git tag with no generated
+`configure`; `tcpdump` needs `bison` and `flex`, because libpcap generates its
+filter parser at build time. The cross-compiler downloads itself.
 
 ## What went wrong before
 

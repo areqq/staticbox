@@ -1,0 +1,26 @@
+# tcpdump: what is actually on the wire.
+#
+# The tool for the questions a set-top box raises and nothing else answers --
+# whether the multicast stream is arriving at all, whether the box is even
+# asking for it, whether the CI+ or portal server is replying, which end is
+# closing a connection. busybox has nothing comparable and no substitute.
+#
+# libpcap is cross-built as a dep rather than reused. packages/nmap and
+# packages/ncat compile the copy bundled in nmap's own tree, which is a
+# different and older thing that goes nowhere outside that build; tcpdump
+# wants a real installed libpcap, and its version is expected to track
+# tcpdump's own.
+PKG=tcpdump
+VERSION=4.99.6
+REVISION=1
+SOURCE=https://www.tcpdump.org/release/tcpdump-4.99.6.tar.gz
+SHA256=5839921a0f67d7d8fa3dacd9cd41e44c89ccb867e8a6db216d62628c7fd14b09
+TOOLCHAIN=zig
+TARGETS=all
+
+DEPS='libpcap'
+DEP_SOURCE_libpcap=https://www.tcpdump.org/release/libpcap-1.10.7.tar.gz
+DEP_SHA256_libpcap=0b394ac90dbc0a9838ff97468e05c9c9a3e873dec2514cd58db65d859d296e31
+
+SMOKE='--version'
+SMOKE_EXPECT='tcpdump version 4.99.6'

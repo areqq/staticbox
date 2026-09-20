@@ -281,3 +281,36 @@ configure that reaches for pkg-config: the answer describes the host unless
 PKG_CONFIG_LIBDIR is pointed somewhere else. Where a library really is wanted,
 the way through is the one packages/openvpn uses -- set the module's own
 `*_CFLAGS` and `*_LIBS`, which makes PKG_CHECK_MODULES skip the probe entirely.
+
+## The same directory as both -I and -isystem loses its priority
+
+strace carries its own copy of the kernel headers and `--enable-bundled=yes`
+says to use them. It was on, the bundled directory was on the compile line,
+and the build still failed on `BTRFS_FEATURE_INCOMPAT_REMAP_TREE` -- a
+constant that exists in strace's bundled `btrfs.h` and not in zig's, which is
+older.
+
+The cause is an include-path rule worth knowing. strace passes its bundled
+directory as `-isystem`. Adding the *same* directory again as `-I` does not
+promote it: clang removes the duplicate from the quoted/bracket chain and
+keeps only the system entry, where zig's own headers are searched first. So
+the `-I` is silently demoted and the toolchain's header wins anyway.
+
+Handing the compiler a *copy* of those headers under a different path fixes
+it, because a different path is a different directory as far as clang is
+concerned and the `-I` keeps its place.
+
+Three things were tried before that and all looked reasonable:
+`CPPFLAGS` to configure (strace overwrites it), `CFLAGS` to configure (same),
+and `CPPFLAGS` on the make command line (arrived, and was demoted).
+
+## A generated parser is a build-host dependency
+
+libpcap ships `grammar.y.in` and `scanner.l`, not the C they generate, so
+`bison` and `flex` have to exist on the machine doing the build. It is the
+second such case here after openvpn's autotools, and both are now in the CI
+image and in the README.
+
+Worth checking for in any new recipe: a release tarball that carries only the
+`.y` or `.l` file is telling you it expects a parser generator, and configure
+will say so only after several minutes of other checks have passed.
