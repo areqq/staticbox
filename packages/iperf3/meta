@@ -1,0 +1,19 @@
+# iperf3: throughput between two machines you control.
+#
+# Not a replacement for packages/speedtest and not overlapping with it.
+# speedtest measures the line to the internet; iperf3 measures the path
+# between the box and something on the same network. When a stream stutters
+# those are different questions, and the local one is usually the answer.
+#
+# One binary is both ends: `iperf3 -s` on one machine, `iperf3 -c <host>` on
+# the other.
+PKG=iperf3
+VERSION=3.21
+REVISION=1
+SOURCE=https://github.com/esnet/iperf/releases/download/3.21/iperf-3.21.tar.gz
+SHA256=656e4405ebd620121de7ceca3eaf43a88f79ea1b857d041a6a0b1314801acdd8
+TOOLCHAIN=zig
+TARGETS=all
+
+SMOKE='--version'
+SMOKE_EXPECT='iperf 3.21'

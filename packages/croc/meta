@@ -1,0 +1,25 @@
+# croc: move a file between two machines without arranging anything first.
+#
+# One side says `croc send file`, which prints a short phrase; the other says
+# `croc <phrase>`. The transfer is end-to-end encrypted with PAKE, and it
+# crosses NAT without port forwarding by falling back to a public relay when
+# the two ends cannot reach each other directly.
+#
+# That last part is the reason this is worth having next to rsync and scp on a
+# box: those need a route and a login, and a set-top box behind a router
+# usually has neither from outside the house.
+#
+# Fully static without asking, because CGO is off on this backend.
+PKG=croc
+VERSION=11.5.3
+REVISION=1
+SOURCE=https://github.com/schollz/croc/archive/refs/tags/v11.5.3.tar.gz
+SHA256=194ec2494f1801d7baa597d30ab6571f4a25f645cf0527aa7a4b66cd5b7a6fa8
+TOOLCHAIN=go
+# No armv7-neon, for the reason packages/speedtest gives: Go's GOARM=7 has no
+# NEON variant, so that build would be byte-identical to armv7, and it could
+# not satisfy the NEON gate either because Go emits no ARM build attributes.
+TARGETS='x86_64 i686 armv5 armv7 aarch64 mips mipsel'
+
+SMOKE='--version'
+SMOKE_EXPECT='11.5.3'
