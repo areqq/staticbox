@@ -9,6 +9,21 @@
 # box: those need a route and a login, and a set-top box behind a router
 # usually has neither from outside the house.
 #
+# Built without the embedded Tailscale data plane (croc_no_tailcat), and that
+# is a deliberate trade rather than a limitation of the build. Measured on
+# x86_64 before choosing: the Tailscale stack is 12.4 MiB of a 22.0 MiB binary
+# and 167 of the 586 Go packages, taking the tarball from 8.7 MB to 3.9 MB.
+#
+# What it costs: no peer-to-peer path, so every transfer goes through a relay,
+# and `croc ssh` -- the collaborative terminal -- is gone, because it shares
+# the same build constraint. `--transport derp` downgrades to the relay with a
+# warning rather than failing.
+#
+# What it buys beyond the size: the far end never learns your address, because
+# there is no direct connection for it to learn it from. On a device whose
+# /tmp is RAM, 4.8 MB saved is worth more than a transport that may not
+# negotiate through its NAT anyway.
+#
 # Fully static without asking, because CGO is off on this backend.
 PKG=croc
 VERSION=11.5.3
