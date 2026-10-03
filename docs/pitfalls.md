@@ -314,3 +314,24 @@ image and in the README.
 Worth checking for in any new recipe: a release tarball that carries only the
 `.y` or `.l` file is telling you it expects a parser generator, and configure
 will say so only after several minutes of other checks have passed.
+
+## A new compiler does not retire a workaround by itself
+
+Moving to zig 0.17.0 (LLVM 22.1.8) was the obvious moment to ask whether the
+two toolchain shims had become dead weight. Both were measured rather than
+assumed, and both are still earning their place:
+
+- **ARMv5 atomics.** A program that merely calls `malloc` still fails to link
+  without the shim, with 30 undefined `__sync_*` symbols coming out of zig's
+  own `compiler_rt/atomics.zig`.
+- **MIPS o32 `pipe()`.** The shim's self-test still fails without it.
+
+The ISA characteristics the gate depends on survived the LLVM jump unchanged:
+armv7 still comes out VFPv3-D16 with no SIMD, armv7-neon VFPv4 with NEONv1,
+and mips encodes `mips32` rather than r2. That was worth checking, because the
+armv7 CPU model in targets.sh was chosen by measuring what the *previous*
+compiler emitted.
+
+The 0.16.0 checksums are kept in lib/toolchain.sh so `SB_ZIG_VER=0.16.0` still
+resolves. Comparing two compilers is how a question like this gets answered,
+and that costs nothing to keep.

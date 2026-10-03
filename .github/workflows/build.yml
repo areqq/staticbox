@@ -77,7 +77,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/zig/zig-cache
-          key: zig-0.16.0-musl-${{ matrix.target }}
+          key: zig-0.17.0-musl-${{ matrix.target }}
 
       - name: Cache the Bootlin toolchain for this target
         uses: actions/cache@v4

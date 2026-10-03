@@ -17,7 +17,7 @@
 # has usually changed directory by the time they are needed.
 : "${SB_LIB_DIR:?SB_LIB_DIR must be set to the directory holding lib/toolchain.sh}"
 
-SB_ZIG_VER="${SB_ZIG_VER:-0.16.0}"
+SB_ZIG_VER="${SB_ZIG_VER:-0.17.0}"
 SB_GO_VER="${SB_GO_VER:-1.27.1}"
 SB_TC_VER="${SB_TC_VER:-2025.08-1}"
 SB_BOOTLIN_BASE='https://toolchains.bootlin.com/downloads/releases/toolchains'
@@ -26,6 +26,11 @@ SB_BOOTLIN_BASE='https://toolchains.bootlin.com/downloads/releases/toolchains'
 # its sums added here; an unpinned download is not accepted.
 sb__zig_sha() {
 	case "$SB_ZIG_VER::$1" in
+		0.17.0::x86_64)  printf '1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026\n' ;;
+		0.17.0::aarch64) printf '9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8\n' ;;
+		# 0.16.0 is kept so SB_ZIG_VER=0.16.0 still builds: the shims below are
+		# written against defects it has, and comparing the two is how anyone
+		# finds out whether a shim is still earning its place.
 		0.16.0::x86_64)  printf '70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00\n' ;;
 		0.16.0::aarch64) printf 'ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17\n' ;;
 		*) return 1 ;;
